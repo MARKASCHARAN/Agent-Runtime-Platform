@@ -1,26 +1,42 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class McpTrustService {
   constructor(private prisma: PrismaService) {}
 
-  async registerTool(data: { toolIdentity: string; publisher: string; schemaHash: string }) {
+  async registerTool(data: {
+    toolIdentity: string;
+    publisher: string;
+    schemaHash: string;
+    projectId: string;
+  }) {
     return this.prisma.toolTrustProfile.upsert({
-      where: { toolIdentity: data.toolIdentity },
+      where: {
+        toolIdentity_projectId: {
+          toolIdentity: data.toolIdentity,
+          projectId: data.projectId,
+        },
+      },
       update: { publisher: data.publisher, schemaHash: data.schemaHash },
       create: {
         toolIdentity: data.toolIdentity,
         publisher: data.publisher,
         schemaHash: data.schemaHash,
         trustStatus: 'UNVERIFIED',
+        projectId: data.projectId,
       },
     });
   }
 
-  async verifyTool(toolIdentity: string, schemaHash: string) {
+  async verifyTool(toolIdentity: string, schemaHash: string, projectId: string) {
     const profile = await this.prisma.toolTrustProfile.findUnique({
-      where: { toolIdentity },
+      where: {
+        toolIdentity_projectId: {
+          toolIdentity,
+          projectId,
+        },
+      },
     });
 
     if (!profile) {
@@ -38,8 +54,9 @@ export class McpTrustService {
     return { allowed: true, reason: 'VERIFIED' };
   }
 
-  async getTrustProfiles() {
+  async getTrustProfiles(projectId: string) {
     return this.prisma.toolTrustProfile.findMany({
+      where: { projectId },
       orderBy: { createdAt: 'desc' },
     });
   }

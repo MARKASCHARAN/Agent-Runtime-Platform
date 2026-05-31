@@ -8,15 +8,21 @@ export class ComplianceService {
   async generateReport(projectId: string) {
     const policySets = await this.prisma.policySet.findMany({
       where: { projectId },
-      include: { decisions: true },
+      include: { decisions: { where: { projectId } } },
     });
 
     const totalDecisions = policySets.reduce((acc, set) => acc + set.decisions.length, 0);
-    const deniedActions = policySets.reduce((acc, set) => acc + set.decisions.filter(d => d.outcome === 'DENY').length, 0);
-    const pendingApprovals = policySets.reduce((acc, set) => acc + set.decisions.filter(d => d.outcome === 'REQUIRE_APPROVAL').length, 0);
+    const deniedActions = policySets.reduce(
+      (acc, set) => acc + set.decisions.filter((d) => d.outcome === 'DENY').length,
+      0,
+    );
+    const pendingApprovals = policySets.reduce(
+      (acc, set) => acc + set.decisions.filter((d) => d.outcome === 'REQUIRE_APPROVAL').length,
+      0,
+    );
 
     const memoryAnomalies = await this.prisma.memoryMutation.count({
-      where: { anomalyScore: { gt: 0.5 } },
+      where: { anomalyScore: { gt: 0.5 }, projectId },
     });
 
     return {

@@ -6,7 +6,7 @@ import { EventsGateway } from '../events/events.gateway';
 export class MemoryService {
   constructor(
     private prisma: PrismaService,
-    private eventsGateway: EventsGateway
+    private eventsGateway: EventsGateway,
   ) {}
 
   async recordMutation(data: {
@@ -15,12 +15,13 @@ export class MemoryService {
     key: string;
     previousValue?: string;
     newValue?: string;
-    sourceMetadata: any;
+    sourceMetadata: Record<string, unknown>;
+    projectId: string;
   }) {
     let anomalyScore = 0.0;
     if (data.mutationType === 'OVERWRITE' && data.previousValue && data.newValue) {
       if (Math.abs(data.newValue.length - data.previousValue.length) > 1000) {
-        anomalyScore = 0.8; 
+        anomalyScore = 0.8;
       }
     }
 
@@ -33,6 +34,7 @@ export class MemoryService {
         newValue: data.newValue,
         sourceMetadata: data.sourceMetadata,
         anomalyScore,
+        projectId: data.projectId,
       },
     });
 
@@ -43,9 +45,9 @@ export class MemoryService {
     return mutation;
   }
 
-  async getMutations(agentId: string) {
+  async getMutations(agentId: string, projectId: string) {
     return this.prisma.memoryMutation.findMany({
-      where: { agentId },
+      where: { agentId, projectId },
       orderBy: { createdAt: 'desc' },
     });
   }
