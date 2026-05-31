@@ -106,6 +106,7 @@ model AgentIdentity {
   createdAt    DateTime @default(now())
 
   tokens AgentToken[]
+  agents AgentRecord[]
 }
 
 model AgentToken {
@@ -116,4 +117,35 @@ model AgentToken {
   createdAt       DateTime @default(now())
 
   agentIdentity AgentIdentity @relation(fields: [agentIdentityId], references: [id])
+}
+
+model AgentRole {
+  id             String   @id @default(uuid())
+  name           String // e.g., 'Financial Agent', 'Customer Support'
+  description    String?
+  allowedIntents String // Comma-separated list or '*'
+  maxRiskScore   Int      @default(100)
+  projectId      String
+  createdAt      DateTime @default(now())
+
+  agents AgentRecord[]
+
+  @@index([projectId])
+}
+
+model AgentRecord {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  status          String   @default("ACTIVE") // 'ACTIVE', 'SUSPENDED', 'RETIRED'
+  agentIdentityId String?
+  roleId          String?
+  projectId       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  role          AgentRole?     @relation(fields: [roleId], references: [id])
+  agentIdentity AgentIdentity? @relation(fields: [agentIdentityId], references: [id])
+
+  @@index([projectId, status])
 }

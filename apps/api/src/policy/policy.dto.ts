@@ -113,6 +113,10 @@ export class EvaluateActionDto {
 
   @IsOptional()
   @IsString()
+  actorId?: string;
+
+  @IsOptional()
+  @IsString()
   executionEventId?: string;
 
   @IsOptional()

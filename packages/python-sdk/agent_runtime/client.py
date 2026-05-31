@@ -72,6 +72,7 @@ class AgentRuntimeClient:
             "policySetId": policy_set_id,
             "actionIntent": action.action_intent,
             "context": action.context,
+            "actorId": envelope.actor_id,
             "executionEventId": envelope.correlation_id,
             "traceId": envelope.idempotency_key,
             "simulate": simulate,

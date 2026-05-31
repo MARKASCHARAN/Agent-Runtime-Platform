@@ -15,6 +15,7 @@ import { AuditModule } from './audit/audit.module';
 import { PrivacyModule } from './privacy/privacy.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { AgentAuthModule } from './agent-auth/agent-auth.module';
+import { AgentInventoryModule } from './agent-inventory/agent-inventory.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { AgentAuthModule } from './agent-auth/agent-auth.module';
     PrivacyModule,
     IntegrationsModule,
     AgentAuthModule,
+    AgentInventoryModule,
   ],
   controllers: [AppController],
   providers: [

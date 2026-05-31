@@ -52,6 +52,7 @@ export class AgentRuntimeClient {
       policySetId,
       actionIntent: action.actionIntent,
       context: action.context,
+      actorId: envelope.actorId,
       executionEventId: envelope.correlationId,
       traceId: envelope.idempotencyKey,
       simulate: options?.simulate,

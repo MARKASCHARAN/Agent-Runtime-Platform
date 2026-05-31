@@ -34,6 +34,7 @@ interface EvaluationResult {
 }
 
 import { PrivacyService } from '../privacy/privacy.service';
+import { AgentInventoryService } from '../agent-inventory/agent-inventory.service';
 
 @Injectable()
 export class PolicyService {
@@ -41,6 +42,7 @@ export class PolicyService {
     private prisma: PrismaService,
     private eventsGateway: EventsGateway,
     private privacy: PrivacyService,
+    private agentInventory: AgentInventoryService,
   ) {}
 
   async createPolicySet(data: CreatePolicySetDto) {
@@ -87,13 +89,58 @@ export class PolicyService {
 
     assertProjectScope(scopedProjectId, policySet.projectId);
 
+    // Phase 2: Agent Governance (Kill Switch & RBAC)
+    let preEvaluationOutcome: PolicyOutcome | null = null;
+    let preEvaluationReason = '';
+
+    if (data.actorId) {
+      // Find the agent by its associated identity clientId
+      const identity = await this.prisma.agentIdentity.findUnique({
+        where: { clientId: data.actorId },
+        include: { agents: { include: { role: true } } },
+      });
+
+      if (identity && identity.agents.length > 0) {
+        const agent = identity.agents[0];
+        
+        // 1. Kill Switch Check
+        if (agent.status === 'SUSPENDED') {
+          preEvaluationOutcome = 'DENY';
+          preEvaluationReason = 'Agent is globally suspended (Kill Switch engaged).';
+        } 
+        // 2. RBAC Intent Check
+        else if (agent.role && agent.role.allowedIntents !== '*') {
+          const allowedIntents = agent.role.allowedIntents.split(',').map(i => i.trim());
+          if (!allowedIntents.includes(data.actionIntent)) {
+            preEvaluationOutcome = 'DENY';
+            preEvaluationReason = `Intent '${data.actionIntent}' is not allowed for role '${agent.role.name}'.`;
+          }
+        }
+      }
+    }
+
     const normalizedRules = policySet.rules as unknown as PolicyRulesDto;
     const traceId = data.traceId ?? randomUUID();
-    const evaluation = this.evaluateRules(
-      data.actionIntent,
-      data.context,
-      normalizedRules,
-    );
+    
+    let evaluation: EvaluationResult;
+    if (preEvaluationOutcome) {
+      evaluation = {
+        outcome: preEvaluationOutcome,
+        matchedRuleIds: ['intrinsic-rbac'],
+        trace: [{
+          id: 'intrinsic-rbac',
+          effect: preEvaluationOutcome,
+          matched: true,
+          conditions: [{ field: 'agent.role', operator: 'intrinsic', expected: 'allowed', actual: preEvaluationReason, matched: false }]
+        }]
+      };
+    } else {
+      evaluation = this.evaluateRules(
+        data.actionIntent,
+        data.context,
+        normalizedRules,
+      );
+    }
 
     const decisionTrace = {
       combine: normalizedRules.combine ?? 'first-match',
