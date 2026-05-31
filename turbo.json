@@ -13,6 +13,12 @@
     "check-types": {
       "dependsOn": ["^check-types"]
     },
+    "test": {
+      "dependsOn": ["^test"]
+    },
+    "test:cov": {
+      "dependsOn": ["^test:cov"]
+    },
     "dev": {
       "cache": false,
       "persistent": true
