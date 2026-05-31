@@ -2,7 +2,7 @@ import { Body, Controller, Get, Post, Req } from '@nestjs/common';
 import { McpTrustService } from './mcp-trust.service';
 import { RegisterToolDto, VerifyToolDto } from './mcp-trust.dto';
 import { Roles } from '../auth/roles.decorator';
-import { AuthenticatedRequest } from '../auth/auth-context';
+import type { AuthenticatedRequest } from '../auth/auth-context';
 
 @Controller('mcp-trust')
 export class McpTrustController {
@@ -19,9 +19,16 @@ export class McpTrustController {
   }
 
   @Post('verify')
-  async verifyTool(@Body() body: VerifyToolDto, @Req() req: AuthenticatedRequest) {
+  async verifyTool(
+    @Body() body: VerifyToolDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
     const projectId = req.auth?.projectId ?? '';
-    return this.trustService.verifyTool(body.toolIdentity, body.schemaHash, projectId);
+    return this.trustService.verifyTool(
+      body.toolIdentity,
+      body.schemaHash,
+      projectId,
+    );
   }
 
   @Get('profiles')

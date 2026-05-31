@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
 import {
@@ -19,7 +20,7 @@ interface RuleConditionTrace {
   matched: boolean;
 }
 
-interface RuleTrace {
+export interface RuleTrace {
   id: string;
   effect: PolicyOutcome;
   matched: boolean;
@@ -50,7 +51,7 @@ export class PolicyService {
         name: data.name,
         description: data.description,
         projectId: data.projectId,
-        rules: data.rules,
+        rules: data.rules as unknown as Prisma.InputJsonValue,
         version: (latestPolicy?.version ?? 0) + 1,
       },
     });
@@ -83,12 +84,17 @@ export class PolicyService {
 
     assertProjectScope(scopedProjectId, policySet.projectId);
 
+    const normalizedRules = policySet.rules as unknown as PolicyRulesDto;
     const traceId = data.traceId ?? randomUUID();
-    const evaluation = this.evaluateRules(data.actionIntent, data.context, policySet.rules as PolicyRulesDto);
+    const evaluation = this.evaluateRules(
+      data.actionIntent,
+      data.context,
+      normalizedRules,
+    );
 
     const decisionTrace = {
-      combine: (policySet.rules as PolicyRulesDto).combine ?? 'first-match',
-      defaultOutcome: (policySet.rules as PolicyRulesDto).defaultOutcome ?? 'ALLOW',
+      combine: normalizedRules.combine ?? 'first-match',
+      defaultOutcome: normalizedRules.defaultOutcome ?? 'ALLOW',
       matchedRuleIds: evaluation.matchedRuleIds,
       trace: evaluation.trace,
       traceId,
@@ -100,6 +106,7 @@ export class PolicyService {
       return {
         simulated: true,
         policySetId: data.policySetId,
+        projectId: policySet.projectId,
         actionIntent: data.actionIntent,
         outcome: evaluation.outcome,
         decisionTrace,
@@ -111,9 +118,9 @@ export class PolicyService {
         policySetId: data.policySetId,
         projectId: policySet.projectId,
         actionIntent: data.actionIntent,
-        context: data.context,
+        context: data.context as Prisma.InputJsonValue,
         outcome: evaluation.outcome,
-        decisionTrace,
+        decisionTrace: decisionTrace as unknown as Prisma.InputJsonValue,
         traceId,
         isSimulation: false,
         executionEventId: data.executionEventId,
@@ -140,13 +147,24 @@ export class PolicyService {
   async getPendingApprovals(policySetId: string, scopedProjectId: string) {
     const policySet = await this.getPolicySet(policySetId, scopedProjectId);
     return this.prisma.policyDecision.findMany({
-      where: { policySetId, projectId: policySet.projectId, outcome: 'REQUIRE_APPROVAL' },
+      where: {
+        policySetId,
+        projectId: policySet.projectId,
+        outcome: 'REQUIRE_APPROVAL',
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async resolveApproval(decisionId: string, resolution: 'ALLOW' | 'DENY', actorId: string, scopedProjectId: string) {
-    const decision = await this.prisma.policyDecision.findUnique({ where: { id: decisionId } });
+  async resolveApproval(
+    decisionId: string,
+    resolution: 'ALLOW' | 'DENY',
+    actorId: string,
+    scopedProjectId: string,
+  ) {
+    const decision = await this.prisma.policyDecision.findUnique({
+      where: { id: decisionId },
+    });
 
     if (!decision) {
       throw new NotFoundException('Policy decision not found');
@@ -172,7 +190,9 @@ export class PolicyService {
     const rules = policyRules?.rules ?? [];
     const activeRules = rules
       .filter((rule) => rule.enabled !== false)
-      .filter((rule) => !rule.actionIntent || rule.actionIntent === actionIntent);
+      .filter(
+        (rule) => !rule.actionIntent || rule.actionIntent === actionIntent,
+      );
 
     const trace: RuleTrace[] = [];
     const matchedRules: PolicyRuleDto[] = [];
@@ -180,7 +200,11 @@ export class PolicyService {
     for (const [index, rule] of activeRules.entries()) {
       const conditionTrace = rule.conditions.map((condition) => {
         const actual = this.getPathValue(context, condition.field);
-        const matched = this.matchesCondition(actual, condition.operator, condition.value);
+        const matched = this.matchesCondition(
+          actual,
+          condition.operator,
+          condition.value,
+        );
         return {
           field: condition.field,
           operator: condition.operator,
@@ -203,7 +227,9 @@ export class PolicyService {
       });
     }
 
-    const matchedRuleIds = trace.filter((entry) => entry.matched).map((entry) => entry.id);
+    const matchedRuleIds = trace
+      .filter((entry) => entry.matched)
+      .map((entry) => entry.id);
     const combine = policyRules.combine ?? 'first-match';
     const defaultOutcome = policyRules.defaultOutcome ?? 'ALLOW';
 
@@ -211,14 +237,21 @@ export class PolicyService {
 
     if (combine === 'deny-overrides') {
       if (matchedRules.some((rule) => rule.effect === 'DENY')) outcome = 'DENY';
-      else if (matchedRules.some((rule) => rule.effect === 'REQUIRE_APPROVAL')) outcome = 'REQUIRE_APPROVAL';
-      else if (matchedRules.some((rule) => rule.effect === 'WARN')) outcome = 'WARN';
-      else if (matchedRules.some((rule) => rule.effect === 'ALLOW')) outcome = 'ALLOW';
+      else if (matchedRules.some((rule) => rule.effect === 'REQUIRE_APPROVAL'))
+        outcome = 'REQUIRE_APPROVAL';
+      else if (matchedRules.some((rule) => rule.effect === 'WARN'))
+        outcome = 'WARN';
+      else if (matchedRules.some((rule) => rule.effect === 'ALLOW'))
+        outcome = 'ALLOW';
     } else if (combine === 'approval-overrides') {
-      if (matchedRules.some((rule) => rule.effect === 'REQUIRE_APPROVAL')) outcome = 'REQUIRE_APPROVAL';
-      else if (matchedRules.some((rule) => rule.effect === 'DENY')) outcome = 'DENY';
-      else if (matchedRules.some((rule) => rule.effect === 'WARN')) outcome = 'WARN';
-      else if (matchedRules.some((rule) => rule.effect === 'ALLOW')) outcome = 'ALLOW';
+      if (matchedRules.some((rule) => rule.effect === 'REQUIRE_APPROVAL'))
+        outcome = 'REQUIRE_APPROVAL';
+      else if (matchedRules.some((rule) => rule.effect === 'DENY'))
+        outcome = 'DENY';
+      else if (matchedRules.some((rule) => rule.effect === 'WARN'))
+        outcome = 'WARN';
+      else if (matchedRules.some((rule) => rule.effect === 'ALLOW'))
+        outcome = 'ALLOW';
     } else {
       const firstMatch = matchedRules.at(0);
       if (firstMatch) {
@@ -230,17 +263,19 @@ export class PolicyService {
   }
 
   private getPathValue(source: Record<string, unknown>, path: string): unknown {
-    return path
-      .split('.')
-      .reduce<unknown>((acc, key) => {
-        if (acc && typeof acc === 'object' && key in acc) {
-          return (acc as Record<string, unknown>)[key];
-        }
-        return undefined;
-      }, source);
+    return path.split('.').reduce<unknown>((acc, key) => {
+      if (acc && typeof acc === 'object' && key in acc) {
+        return (acc as Record<string, unknown>)[key];
+      }
+      return undefined;
+    }, source);
   }
 
-  private matchesCondition(actual: unknown, operator: string, expected: unknown): boolean {
+  private matchesCondition(
+    actual: unknown,
+    operator: string,
+    expected: unknown,
+  ): boolean {
     switch (operator) {
       case 'eq':
         return actual === expected;
@@ -257,15 +292,31 @@ export class PolicyService {
             ? actual.includes(expected)
             : false;
       case 'gt':
-        return typeof actual === 'number' && typeof expected === 'number' && actual > expected;
+        return (
+          typeof actual === 'number' &&
+          typeof expected === 'number' &&
+          actual > expected
+        );
       case 'gte':
-        return typeof actual === 'number' && typeof expected === 'number' && actual >= expected;
+        return (
+          typeof actual === 'number' &&
+          typeof expected === 'number' &&
+          actual >= expected
+        );
       case 'lt':
-        return typeof actual === 'number' && typeof expected === 'number' && actual < expected;
+        return (
+          typeof actual === 'number' &&
+          typeof expected === 'number' &&
+          actual < expected
+        );
       case 'lte':
-        return typeof actual === 'number' && typeof expected === 'number' && actual <= expected;
+        return (
+          typeof actual === 'number' &&
+          typeof expected === 'number' &&
+          actual <= expected
+        );
       case 'exists':
-        return Boolean(expected) ? actual !== undefined : actual === undefined;
+        return expected ? actual !== undefined : actual === undefined;
       case 'regex':
         return typeof actual === 'string' && typeof expected === 'string'
           ? new RegExp(expected).test(actual)

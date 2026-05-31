@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
 
@@ -19,7 +20,11 @@ export class MemoryService {
     projectId: string;
   }) {
     let anomalyScore = 0.0;
-    if (data.mutationType === 'OVERWRITE' && data.previousValue && data.newValue) {
+    if (
+      data.mutationType === 'OVERWRITE' &&
+      data.previousValue &&
+      data.newValue
+    ) {
       if (Math.abs(data.newValue.length - data.previousValue.length) > 1000) {
         anomalyScore = 0.8;
       }
@@ -32,7 +37,7 @@ export class MemoryService {
         key: data.key,
         previousValue: data.previousValue,
         newValue: data.newValue,
-        sourceMetadata: data.sourceMetadata,
+        sourceMetadata: data.sourceMetadata as Prisma.InputJsonValue,
         anomalyScore,
         projectId: data.projectId,
       },

@@ -40,7 +40,13 @@ describe('PolicyService', () => {
             id: 'rule-1',
             effect: 'DENY',
             actionIntent: 'DB_WRITE',
-            conditions: [{ field: 'resource.classification', operator: 'eq', value: 'sensitive' }],
+            conditions: [
+              {
+                field: 'resource.classification',
+                operator: 'eq',
+                value: 'sensitive',
+              },
+            ],
           },
         ],
       },

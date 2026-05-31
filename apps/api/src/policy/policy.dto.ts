@@ -9,7 +9,12 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-export const POLICY_OUTCOMES = ['ALLOW', 'DENY', 'WARN', 'REQUIRE_APPROVAL'] as const;
+export const POLICY_OUTCOMES = [
+  'ALLOW',
+  'DENY',
+  'WARN',
+  'REQUIRE_APPROVAL',
+] as const;
 export type PolicyOutcome = (typeof POLICY_OUTCOMES)[number];
 
 const RULE_OPERATORS = [

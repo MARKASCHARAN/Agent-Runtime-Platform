@@ -19,7 +19,9 @@ export class AuthGuard implements CanActivate {
       .map((key) => key.trim())
       .filter(Boolean);
 
-    const bearer = request.headers.authorization?.replace(/^Bearer\s+/i, '').trim();
+    const bearer = request.headers.authorization
+      ?.replace(/^Bearer\s+/i, '')
+      .trim();
     const headerApiKey = request.headers['x-api-key'];
     const apiKey =
       (typeof headerApiKey === 'string' ? headerApiKey : undefined) ?? bearer;
@@ -40,7 +42,9 @@ export class AuthGuard implements CanActivate {
 
     const rawRole = request.headers['x-user-role'];
     const normalizedRole =
-      typeof rawRole === 'string' ? (rawRole.trim().toLowerCase() as UserRole) : 'viewer';
+      typeof rawRole === 'string'
+        ? (rawRole.trim().toLowerCase() as UserRole)
+        : 'viewer';
 
     request.auth = {
       apiKeyId: apiKey,

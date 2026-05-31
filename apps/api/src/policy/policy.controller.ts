@@ -1,19 +1,11 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-  Query,
-  Req,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
 import { PolicyService } from './policy.service';
 import {
   CreatePolicySetDto,
   EvaluateActionDto,
   ResolveApprovalDto,
 } from './policy.dto';
-import { AuthenticatedRequest } from '../auth/auth-context';
+import type { AuthenticatedRequest } from '../auth/auth-context';
 import { assertProjectScope } from '../common/project-scope';
 import { Roles } from '../auth/roles.decorator';
 import { AuditService } from '../audit/audit.service';
@@ -55,7 +47,10 @@ export class PolicyController {
   }
 
   @Get('sets/:id')
-  async getPolicySet(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+  async getPolicySet(
+    @Param('id') id: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
     const scopedProjectId = req.auth?.projectId ?? '';
     return this.policyService.getPolicySet(id, scopedProjectId);
   }
@@ -66,7 +61,10 @@ export class PolicyController {
     @Req() req: AuthenticatedRequest,
   ) {
     const scopedProjectId = req.auth?.projectId ?? '';
-    const decision = await this.policyService.evaluateAction(body, scopedProjectId);
+    const decision = await this.policyService.evaluateAction(
+      body,
+      scopedProjectId,
+    );
 
     this.auditService.logSensitiveEvent('policy.action.evaluated', {
       policySetId: body.policySetId,
@@ -80,14 +78,20 @@ export class PolicyController {
   }
 
   @Get('sets/:id/decisions')
-  async getDecisions(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+  async getDecisions(
+    @Param('id') id: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
     const scopedProjectId = req.auth?.projectId ?? '';
     return this.policyService.getDecisions(id, scopedProjectId);
   }
 
   @Get('sets/:id/approvals')
   @Roles('admin', 'approver')
-  async getPendingApprovals(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+  async getPendingApprovals(
+    @Param('id') id: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
     const scopedProjectId = req.auth?.projectId ?? '';
     return this.policyService.getPendingApprovals(id, scopedProjectId);
   }

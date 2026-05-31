@@ -11,13 +11,19 @@ export class ComplianceService {
       include: { decisions: { where: { projectId } } },
     });
 
-    const totalDecisions = policySets.reduce((acc, set) => acc + set.decisions.length, 0);
+    const totalDecisions = policySets.reduce(
+      (acc, set) => acc + set.decisions.length,
+      0,
+    );
     const deniedActions = policySets.reduce(
-      (acc, set) => acc + set.decisions.filter((d) => d.outcome === 'DENY').length,
+      (acc, set) =>
+        acc + set.decisions.filter((d) => d.outcome === 'DENY').length,
       0,
     );
     const pendingApprovals = policySets.reduce(
-      (acc, set) => acc + set.decisions.filter((d) => d.outcome === 'REQUIRE_APPROVAL').length,
+      (acc, set) =>
+        acc +
+        set.decisions.filter((d) => d.outcome === 'REQUIRE_APPROVAL').length,
       0,
     );
 

@@ -41,6 +41,8 @@ describe('AuthGuard', () => {
       switchToHttp: () => ({ getRequest: () => req }),
     } as ExecutionContext;
 
-    expect(() => guard.canActivate(context)).toThrow('x-project-id header is required');
+    expect(() => guard.canActivate(context)).toThrow(
+      'x-project-id header is required',
+    );
   });
 });

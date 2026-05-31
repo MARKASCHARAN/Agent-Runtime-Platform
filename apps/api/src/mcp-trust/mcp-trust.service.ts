@@ -29,7 +29,11 @@ export class McpTrustService {
     });
   }
 
-  async verifyTool(toolIdentity: string, schemaHash: string, projectId: string) {
+  async verifyTool(
+    toolIdentity: string,
+    schemaHash: string,
+    projectId: string,
+  ) {
     const profile = await this.prisma.toolTrustProfile.findUnique({
       where: {
         toolIdentity_projectId: {

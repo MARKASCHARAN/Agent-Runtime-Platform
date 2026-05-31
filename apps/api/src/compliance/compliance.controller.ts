@@ -1,6 +1,6 @@
 import { Controller, Get, Param, Req } from '@nestjs/common';
 import { ComplianceService } from './compliance.service';
-import { AuthenticatedRequest } from '../auth/auth-context';
+import type { AuthenticatedRequest } from '../auth/auth-context';
 import { assertProjectScope } from '../common/project-scope';
 
 @Controller('compliance')

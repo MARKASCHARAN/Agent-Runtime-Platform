@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -16,7 +17,7 @@ export class ReplayService {
       data: {
         replayCorrelationId: data.replayCorrelationId,
         eventType: data.eventType,
-        payload: data.payload,
+        payload: data.payload as Prisma.InputJsonValue,
         actorId: data.actorId,
         projectId: data.projectId,
       },
