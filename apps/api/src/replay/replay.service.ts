@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -8,37 +9,37 @@ export class ReplayService {
   async ingestEvent(data: {
     replayCorrelationId: string;
     eventType: string;
-    payload: any;
+    payload: Record<string, unknown>;
     actorId: string;
+    projectId: string;
   }) {
     return this.prisma.executionEvent.create({
       data: {
         replayCorrelationId: data.replayCorrelationId,
         eventType: data.eventType,
-        payload: data.payload,
+        payload: data.payload as Prisma.InputJsonValue,
         actorId: data.actorId,
+        projectId: data.projectId,
       },
     });
   }
 
-  async getTimeline(replayCorrelationId: string) {
+  async getTimeline(replayCorrelationId: string, projectId: string) {
     return this.prisma.executionEvent.findMany({
-      where: { replayCorrelationId },
+      where: { replayCorrelationId, projectId },
       orderBy: { createdAt: 'asc' },
     });
   }
 
-  async exportEvidence(replayCorrelationId: string) {
-    const events = await this.getTimeline(replayCorrelationId);
-    
-    // In a real application, you might cryptographically sign this payload
-    const exportBundle = {
+  async exportEvidence(replayCorrelationId: string, projectId: string) {
+    const events = await this.getTimeline(replayCorrelationId, projectId);
+
+    return {
       correlationId: replayCorrelationId,
+      projectId,
       exportedAt: new Date().toISOString(),
       eventCount: events.length,
       events,
     };
-
-    return exportBundle;
   }
 }

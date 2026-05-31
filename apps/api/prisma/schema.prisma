@@ -6,64 +6,82 @@ datasource db {
   provider = "postgresql"
 }
 
-// Phase 2: Runtime Policy Engine
 model PolicySet {
   id          String   @id @default(uuid())
   name        String
   description String?
   version     Int      @default(1)
-  rules       Json     // Stores policy rules configuration
+  rules       Json
   projectId   String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   decisions   PolicyDecision[]
+
+  @@index([projectId, createdAt])
 }
 
 model PolicyDecision {
-  id              String   @id @default(uuid())
-  policySetId     String
-  policySet       PolicySet @relation(fields: [policySetId], references: [id])
-  actionIntent    String   // The intended action (e.g., 'API_CALL', 'DB_WRITE')
-  context         Json     // Action context (payload, actor, etc.)
-  outcome         String   // ALLOW, DENY, WARN, REQUIRE_APPROVAL
-  executionEventId String? // Link to Replay Engine event
-  createdAt       DateTime @default(now())
+  id               String    @id @default(uuid())
+  policySetId      String
+  policySet        PolicySet @relation(fields: [policySetId], references: [id])
+  projectId        String
+  actionIntent     String
+  context          Json
+  outcome          String
+  decisionTrace    Json?
+  isSimulation     Boolean   @default(false)
+  traceId          String    @default(uuid())
+  resolvedBy       String?
+  resolvedAt       DateTime?
+  executionEventId String?
+  createdAt        DateTime  @default(now())
+
+  @@index([policySetId, createdAt])
+  @@index([projectId, createdAt])
 }
 
-// Phase 2: Attack Replay Engine
 model ExecutionEvent {
   id                  String   @id @default(uuid())
   replayCorrelationId String
-  eventType           String   // PROMPT, TOOL_CALL, MEMORY_MUTATION, ACTION
+  eventType           String
   payload             Json
   actorId             String
+  projectId           String
+  traceId             String?
   createdAt           DateTime @default(now())
 
+  @@index([projectId, createdAt])
   @@index([replayCorrelationId])
 }
 
-// Phase 3: MCP Security Engine
 model ToolTrustProfile {
   id             String   @id @default(uuid())
-  toolIdentity   String   @unique
+  toolIdentity   String
   publisher      String
   schemaHash     String
-  riskScore      Int      @default(0) // 0-100
-  trustStatus    String   // TRUSTED, UNTRUSTED, VERIFIED
+  riskScore      Int      @default(0)
+  trustStatus    String
+  projectId      String
   lastVerifiedAt DateTime @default(now())
   createdAt      DateTime @default(now())
+
+  @@unique([toolIdentity, projectId])
+  @@index([projectId, createdAt])
 }
 
-// Phase 3: Memory Integrity Engine
 model MemoryMutation {
-  id           String   @id @default(uuid())
-  agentId      String
-  mutationType String   // WRITE, DELETE, OVERWRITE
-  key          String
-  previousValue String?
-  newValue     String?
-  sourceMetadata Json   // Actor/Trust info
-  anomalyScore Float    @default(0.0)
-  createdAt    DateTime @default(now())
+  id             String   @id @default(uuid())
+  agentId        String
+  mutationType   String
+  key            String
+  previousValue  String?
+  newValue       String?
+  sourceMetadata Json
+  anomalyScore   Float    @default(0.0)
+  projectId      String
+  createdAt      DateTime @default(now())
+
+  @@index([projectId, createdAt])
+  @@index([agentId, createdAt])
 }

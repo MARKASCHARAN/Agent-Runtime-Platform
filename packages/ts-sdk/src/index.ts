@@ -1,104 +1,120 @@
-import axios from 'axios';
+import axios, { AxiosError, AxiosInstance } from 'axios';
 
 export interface AgentRuntimeConfig {
   apiKey: string;
   projectId: string;
   endpoint?: string;
+  requestTimeoutMs?: number;
+  retryCount?: number;
 }
 
 export interface ActionIntentPayload {
   actionIntent: string;
-  context: any;
+  context: Record<string, unknown>;
 }
 
 export interface RuntimeEnvelope {
   correlationId?: string;
   actorId: string;
+  idempotencyKey?: string;
+  schemaVersion?: string;
 }
 
 export class AgentRuntimeClient {
-  private endpoint: string;
-  private apiKey: string;
-  private projectId: string;
+  private readonly endpoint: string;
+  private readonly apiKey: string;
+  private readonly projectId: string;
+  private readonly retryCount: number;
+  private readonly httpClient: AxiosInstance;
 
   constructor(config: AgentRuntimeConfig) {
     this.apiKey = config.apiKey;
     this.projectId = config.projectId;
     this.endpoint = config.endpoint || 'http://localhost:3000';
+    this.retryCount = config.retryCount ?? 2;
+    this.httpClient = axios.create({
+      baseURL: this.endpoint,
+      timeout: config.requestTimeoutMs ?? 5000,
+      headers: {
+        'x-api-key': this.apiKey,
+        'x-project-id': this.projectId,
+      },
+    });
   }
 
-  /**
-   * Evaluate an action intent against the runtime policy before executing it.
-   */
   async evaluateAction(
     policySetId: string,
     action: ActionIntentPayload,
-    envelope: RuntimeEnvelope
+    envelope: RuntimeEnvelope,
+    options?: { simulate?: boolean },
   ): Promise<{ outcome: string }> {
-    const res = await axios.post(
-      `${this.endpoint}/policy/evaluate`,
-      {
-        policySetId,
-        actionIntent: action.actionIntent,
-        context: action.context,
-        executionEventId: envelope.correlationId,
-      },
-      { headers: { Authorization: `Bearer ${this.apiKey}` } }
-    );
-    return res.data;
+    const res = await this.postWithRetry<{ outcome: string }>('/policy/evaluate', {
+      policySetId,
+      actionIntent: action.actionIntent,
+      context: action.context,
+      executionEventId: envelope.correlationId,
+      traceId: envelope.idempotencyKey,
+      simulate: options?.simulate,
+    });
+    return res;
   }
 
-  /**
-   * Ingest an execution event for the Attack Replay Engine.
-   */
   async recordEvent(
     eventType: 'PROMPT' | 'TOOL_CALL' | 'MEMORY_MUTATION' | 'ACTION',
-    payload: any,
-    envelope: RuntimeEnvelope
+    payload: Record<string, unknown>,
+    envelope: RuntimeEnvelope,
   ): Promise<void> {
     if (!envelope.correlationId) return;
 
-    await axios.post(
-      `${this.endpoint}/replay/ingest`,
-      {
-        replayCorrelationId: envelope.correlationId,
-        eventType,
-        payload,
-        actorId: envelope.actorId,
-      },
-      { headers: { Authorization: `Bearer ${this.apiKey}` } }
-    );
+    await this.postWithRetry('/replay/ingest', {
+      replayCorrelationId: envelope.correlationId,
+      eventType,
+      payload,
+      actorId: envelope.actorId,
+      projectId: this.projectId,
+      traceId: envelope.idempotencyKey,
+    });
   }
 
-  /**
-   * Verify an MCP tool's trust status and schema hash before execution.
-   */
   async verifyTool(toolIdentity: string, schemaHash: string): Promise<{ allowed: boolean; reason: string }> {
-    const res = await axios.post(
-      `${this.endpoint}/mcp-trust/verify`,
-      { toolIdentity, schemaHash },
-      { headers: { Authorization: `Bearer ${this.apiKey}` } }
-    );
-    return res.data;
+    return this.postWithRetry('/mcp-trust/verify', { toolIdentity, schemaHash });
   }
 
-  /**
-   * Record a memory mutation to the integrity ledger.
-   */
-  async recordMemoryMutation(mutation: {
-    mutationType: string;
-    key: string;
-    previousValue?: string;
-    newValue?: string;
-    sourceMetadata: any;
-  }, envelope: RuntimeEnvelope): Promise<void> {
-    await axios.post(
-      `${this.endpoint}/memory/mutate`,
-      {
-        ...mutation,
-        agentId: envelope.actorId,
-      },
-      { headers: { Authorization: `Bearer ${this.apiKey}` } }
-    );
+  async recordMemoryMutation(
+    mutation: {
+      mutationType: string;
+      key: string;
+      previousValue?: string;
+      newValue?: string;
+      sourceMetadata: Record<string, unknown>;
+    },
+    envelope: RuntimeEnvelope,
+  ): Promise<void> {
+    await this.postWithRetry('/memory/mutate', {
+      ...mutation,
+      projectId: this.projectId,
+      agentId: envelope.actorId,
+    });
+  }
+
+  private async postWithRetry<T = unknown>(path: string, payload: Record<string, unknown>): Promise<T> {
+    let lastError: unknown;
+    for (let attempt = 0; attempt <= this.retryCount; attempt += 1) {
+      try {
+        const response = await this.httpClient.post<T>(path, payload);
+        return response.data;
+      } catch (error) {
+        lastError = error;
+        const isRetryable =
+          error instanceof AxiosError &&
+          (error.response?.status === undefined || error.response.status >= 500 || error.code === 'ECONNABORTED');
+
+        if (!isRetryable || attempt === this.retryCount) {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError;
   }
 }

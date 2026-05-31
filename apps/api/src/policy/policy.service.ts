@@ -1,21 +1,58 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
+import {
+  CreatePolicySetDto,
+  EvaluateActionDto,
+  PolicyOutcome,
+  PolicyRuleDto,
+  PolicyRulesDto,
+} from './policy.dto';
+import { assertProjectScope } from '../common/project-scope';
+
+interface RuleConditionTrace {
+  field: string;
+  operator: string;
+  expected: unknown;
+  actual: unknown;
+  matched: boolean;
+}
+
+export interface RuleTrace {
+  id: string;
+  effect: PolicyOutcome;
+  matched: boolean;
+  conditions: RuleConditionTrace[];
+}
+
+interface EvaluationResult {
+  outcome: PolicyOutcome;
+  matchedRuleIds: string[];
+  trace: RuleTrace[];
+}
 
 @Injectable()
 export class PolicyService {
   constructor(
     private prisma: PrismaService,
-    private eventsGateway: EventsGateway
+    private eventsGateway: EventsGateway,
   ) {}
 
-  async createPolicySet(data: { name: string; description?: string; projectId: string; rules: any }) {
+  async createPolicySet(data: CreatePolicySetDto) {
+    const latestPolicy = await this.prisma.policySet.findFirst({
+      where: { projectId: data.projectId, name: data.name },
+      orderBy: { version: 'desc' },
+    });
+
     return this.prisma.policySet.create({
       data: {
         name: data.name,
         description: data.description,
         projectId: data.projectId,
-        rules: data.rules,
+        rules: data.rules as unknown as Prisma.InputJsonValue,
+        version: (latestPolicy?.version ?? 0) + 1,
       },
     });
   }
@@ -23,62 +60,269 @@ export class PolicyService {
   async getPolicySets(projectId: string) {
     return this.prisma.policySet.findMany({
       where: { projectId },
+      orderBy: { updatedAt: 'desc' },
     });
   }
 
-  async getPolicySet(id: string) {
+  async getPolicySet(id: string, scopedProjectId: string) {
     const policy = await this.prisma.policySet.findUnique({
       where: { id },
     });
     if (!policy) throw new NotFoundException('PolicySet not found');
+    assertProjectScope(scopedProjectId, policy.projectId);
     return policy;
   }
 
-  async evaluateAction(data: { policySetId: string; actionIntent: string; context: any; executionEventId?: string }) {
-    let outcome = 'ALLOW';
-    if (data.actionIntent === 'DANGEROUS_DB_DROP') {
-      outcome = 'DENY';
-    } else if (data.actionIntent === 'SENSITIVE_API_CALL') {
-      outcome = 'REQUIRE_APPROVAL';
+  async evaluateAction(data: EvaluateActionDto, scopedProjectId: string) {
+    const policySet = await this.prisma.policySet.findUnique({
+      where: { id: data.policySetId },
+    });
+
+    if (!policySet) {
+      throw new NotFoundException('PolicySet not found');
+    }
+
+    assertProjectScope(scopedProjectId, policySet.projectId);
+
+    const normalizedRules = policySet.rules as unknown as PolicyRulesDto;
+    const traceId = data.traceId ?? randomUUID();
+    const evaluation = this.evaluateRules(
+      data.actionIntent,
+      data.context,
+      normalizedRules,
+    );
+
+    const decisionTrace = {
+      combine: normalizedRules.combine ?? 'first-match',
+      defaultOutcome: normalizedRules.defaultOutcome ?? 'ALLOW',
+      matchedRuleIds: evaluation.matchedRuleIds,
+      trace: evaluation.trace,
+      traceId,
+      simulated: Boolean(data.simulate),
+      evaluatedAt: new Date().toISOString(),
+    };
+
+    if (data.simulate) {
+      return {
+        simulated: true,
+        policySetId: data.policySetId,
+        projectId: policySet.projectId,
+        actionIntent: data.actionIntent,
+        outcome: evaluation.outcome,
+        decisionTrace,
+      };
     }
 
     const decision = await this.prisma.policyDecision.create({
       data: {
         policySetId: data.policySetId,
+        projectId: policySet.projectId,
         actionIntent: data.actionIntent,
-        context: data.context,
-        outcome,
+        context: data.context as Prisma.InputJsonValue,
+        outcome: evaluation.outcome,
+        decisionTrace: decisionTrace as unknown as Prisma.InputJsonValue,
+        traceId,
+        isSimulation: false,
         executionEventId: data.executionEventId,
       },
     });
 
-    if (outcome === 'REQUIRE_APPROVAL') {
+    if (decision.outcome === 'REQUIRE_APPROVAL') {
       this.eventsGateway.emitApprovalRequired(decision);
     }
-    
+
     this.eventsGateway.emitPolicyIntervention(decision);
 
     return decision;
   }
 
-  async getDecisions(policySetId: string) {
+  async getDecisions(policySetId: string, scopedProjectId: string) {
+    const policySet = await this.getPolicySet(policySetId, scopedProjectId);
     return this.prisma.policyDecision.findMany({
-      where: { policySetId },
+      where: { policySetId, projectId: policySet.projectId },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async getPendingApprovals(policySetId: string) {
+  async getPendingApprovals(policySetId: string, scopedProjectId: string) {
+    const policySet = await this.getPolicySet(policySetId, scopedProjectId);
     return this.prisma.policyDecision.findMany({
-      where: { policySetId, outcome: 'REQUIRE_APPROVAL' },
+      where: {
+        policySetId,
+        projectId: policySet.projectId,
+        outcome: 'REQUIRE_APPROVAL',
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async resolveApproval(decisionId: string, resolution: 'ALLOW' | 'DENY') {
+  async resolveApproval(
+    decisionId: string,
+    resolution: 'ALLOW' | 'DENY',
+    actorId: string,
+    scopedProjectId: string,
+  ) {
+    const decision = await this.prisma.policyDecision.findUnique({
+      where: { id: decisionId },
+    });
+
+    if (!decision) {
+      throw new NotFoundException('Policy decision not found');
+    }
+
+    assertProjectScope(scopedProjectId, decision.projectId);
+
     return this.prisma.policyDecision.update({
       where: { id: decisionId },
-      data: { outcome: resolution },
+      data: {
+        outcome: resolution,
+        resolvedBy: actorId,
+        resolvedAt: new Date(),
+      },
     });
+  }
+
+  private evaluateRules(
+    actionIntent: string,
+    context: Record<string, unknown>,
+    policyRules: PolicyRulesDto,
+  ): EvaluationResult {
+    const rules = policyRules?.rules ?? [];
+    const activeRules = rules
+      .filter((rule) => rule.enabled !== false)
+      .filter(
+        (rule) => !rule.actionIntent || rule.actionIntent === actionIntent,
+      );
+
+    const trace: RuleTrace[] = [];
+    const matchedRules: PolicyRuleDto[] = [];
+
+    for (const [index, rule] of activeRules.entries()) {
+      const conditionTrace = rule.conditions.map((condition) => {
+        const actual = this.getPathValue(context, condition.field);
+        const matched = this.matchesCondition(
+          actual,
+          condition.operator,
+          condition.value,
+        );
+        return {
+          field: condition.field,
+          operator: condition.operator,
+          expected: condition.value,
+          actual,
+          matched,
+        };
+      });
+
+      const matched = conditionTrace.every((condition) => condition.matched);
+      if (matched) {
+        matchedRules.push(rule);
+      }
+
+      trace.push({
+        id: rule.id ?? `${rule.effect.toLowerCase()}-${index + 1}`,
+        effect: rule.effect,
+        matched,
+        conditions: conditionTrace,
+      });
+    }
+
+    const matchedRuleIds = trace
+      .filter((entry) => entry.matched)
+      .map((entry) => entry.id);
+    const combine = policyRules.combine ?? 'first-match';
+    const defaultOutcome = policyRules.defaultOutcome ?? 'ALLOW';
+
+    let outcome: PolicyOutcome = defaultOutcome;
+
+    if (combine === 'deny-overrides') {
+      if (matchedRules.some((rule) => rule.effect === 'DENY')) outcome = 'DENY';
+      else if (matchedRules.some((rule) => rule.effect === 'REQUIRE_APPROVAL'))
+        outcome = 'REQUIRE_APPROVAL';
+      else if (matchedRules.some((rule) => rule.effect === 'WARN'))
+        outcome = 'WARN';
+      else if (matchedRules.some((rule) => rule.effect === 'ALLOW'))
+        outcome = 'ALLOW';
+    } else if (combine === 'approval-overrides') {
+      if (matchedRules.some((rule) => rule.effect === 'REQUIRE_APPROVAL'))
+        outcome = 'REQUIRE_APPROVAL';
+      else if (matchedRules.some((rule) => rule.effect === 'DENY'))
+        outcome = 'DENY';
+      else if (matchedRules.some((rule) => rule.effect === 'WARN'))
+        outcome = 'WARN';
+      else if (matchedRules.some((rule) => rule.effect === 'ALLOW'))
+        outcome = 'ALLOW';
+    } else {
+      const firstMatch = matchedRules.at(0);
+      if (firstMatch) {
+        outcome = firstMatch.effect;
+      }
+    }
+
+    return { outcome, matchedRuleIds, trace };
+  }
+
+  private getPathValue(source: Record<string, unknown>, path: string): unknown {
+    return path.split('.').reduce<unknown>((acc, key) => {
+      if (acc && typeof acc === 'object' && key in acc) {
+        return (acc as Record<string, unknown>)[key];
+      }
+      return undefined;
+    }, source);
+  }
+
+  private matchesCondition(
+    actual: unknown,
+    operator: string,
+    expected: unknown,
+  ): boolean {
+    switch (operator) {
+      case 'eq':
+        return actual === expected;
+      case 'neq':
+        return actual !== expected;
+      case 'in':
+        return Array.isArray(expected) ? expected.includes(actual) : false;
+      case 'not_in':
+        return Array.isArray(expected) ? !expected.includes(actual) : false;
+      case 'contains':
+        return Array.isArray(actual)
+          ? actual.includes(expected)
+          : typeof actual === 'string' && typeof expected === 'string'
+            ? actual.includes(expected)
+            : false;
+      case 'gt':
+        return (
+          typeof actual === 'number' &&
+          typeof expected === 'number' &&
+          actual > expected
+        );
+      case 'gte':
+        return (
+          typeof actual === 'number' &&
+          typeof expected === 'number' &&
+          actual >= expected
+        );
+      case 'lt':
+        return (
+          typeof actual === 'number' &&
+          typeof expected === 'number' &&
+          actual < expected
+        );
+      case 'lte':
+        return (
+          typeof actual === 'number' &&
+          typeof expected === 'number' &&
+          actual <= expected
+        );
+      case 'exists':
+        return expected ? actual !== undefined : actual === undefined;
+      case 'regex':
+        return typeof actual === 'string' && typeof expected === 'string'
+          ? new RegExp(expected).test(actual)
+          : false;
+      default:
+        return false;
+    }
   }
 }

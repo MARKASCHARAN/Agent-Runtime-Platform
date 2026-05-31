@@ -1,4 +1,8 @@
-import { WebSocketGateway, WebSocketServer, OnGatewayInit } from '@nestjs/websockets';
+import {
+  WebSocketGateway,
+  WebSocketServer,
+  OnGatewayInit,
+} from '@nestjs/websockets';
 import { Server } from 'socket.io';
 
 @WebSocketGateway({ cors: true })
@@ -6,7 +10,7 @@ export class EventsGateway implements OnGatewayInit {
   @WebSocketServer()
   server: Server;
 
-  afterInit(server: Server) {
+  afterInit() {
     console.log('WebSocket Gateway Initialized');
   }
 
