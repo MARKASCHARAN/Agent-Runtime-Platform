@@ -27,7 +27,12 @@ export default function DlpDashboardPage() {
         },
       });
       const data = await res.json();
-      setViolations(data);
+      if (Array.isArray(data)) {
+        setViolations(data);
+      } else {
+        console.error("API returned non-array:", data);
+        setViolations([]);
+      }
     } catch (err) {
       console.error(err);
     } finally {

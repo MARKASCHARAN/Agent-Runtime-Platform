@@ -39,7 +39,12 @@ export default function ThreatsPage() {
         },
       });
       const data = await res.json();
-      setAgents(data);
+      if (Array.isArray(data)) {
+        setAgents(data);
+      } else {
+        console.error("API returned non-array:", data);
+        setAgents([]);
+      }
     } catch (err) {
       console.error(err);
     } finally {

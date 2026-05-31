@@ -1,6 +1,0 @@
-{
-  "name": "@agent-runtime/worker",
-  "version": "0.1.0",
-  "private": true,
-  "description": "Background worker for the Agent Governance Platform"
-}

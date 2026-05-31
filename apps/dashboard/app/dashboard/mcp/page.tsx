@@ -27,7 +27,12 @@ export default function McpRegistryPage() {
         },
       });
       const data = await res.json();
-      setTools(data);
+      if (Array.isArray(data)) {
+        setTools(data);
+      } else {
+        console.error("API returned non-array:", data);
+        setTools([]);
+      }
     } catch (err) {
       console.error(err);
     } finally {

@@ -1,6 +1,0 @@
-{
-  "name": "@agent-runtime/desktop",
-  "version": "0.1.0",
-  "private": true,
-  "description": "Desktop companion app for the Agent Governance Platform"
-}
