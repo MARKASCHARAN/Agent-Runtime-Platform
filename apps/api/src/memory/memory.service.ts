@@ -56,4 +56,31 @@ export class MemoryService {
       orderBy: { createdAt: 'desc' },
     });
   }
+
+  async createCheckpoint(data: { agentId: string, state: Record<string, unknown>, projectId: string }) {
+    return this.prisma.agentCheckpoint.create({
+      data: {
+        agentId: data.agentId,
+        state: data.state as Prisma.InputJsonValue,
+        projectId: data.projectId
+      }
+    });
+  }
+
+  async rollback(checkpointId: string, projectId: string) {
+    const checkpoint = await this.prisma.agentCheckpoint.findUnique({
+      where: { id: checkpointId }
+    });
+    
+    if (!checkpoint) {
+      throw new Error('Checkpoint not found');
+    }
+    if (checkpoint.projectId !== projectId) {
+      throw new Error('Unauthorized');
+    }
+
+    // In a real implementation, this would emit an event to the agent engine to physically revert its context
+    // For now, we return the state so the SDK can return it to the agent.
+    return checkpoint;
+  }
 }

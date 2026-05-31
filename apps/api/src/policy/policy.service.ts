@@ -38,6 +38,11 @@ import { AgentInventoryService } from '../agent-inventory/agent-inventory.servic
 import { ThreatIntelService } from '../threat-intel/threat-intel.service';
 import { McpTrustService } from '../mcp-trust/mcp-trust.service';
 
+/**
+ * The Core Zero-Trust Policy Engine.
+ * Evaluates autonomous agent actions against configured Policy Sets, Role-Based Access Controls (RBAC),
+ * Data Loss Prevention (DLP) rules, and MCP Supply Chain Trust before permitting execution.
+ */
 @Injectable()
 export class PolicyService {
   constructor(
@@ -82,6 +87,18 @@ export class PolicyService {
     return policy;
   }
 
+  /**
+   * The primary Zero-Trust evaluation method.
+   * Intercepts an agent's proposed action and runs it through a gauntlet of security checks:
+   * 1. DLP Scan (Data Exfiltration Prevention)
+   * 2. MCP Trust Verification (Supply Chain Attacks)
+   * 3. Kill Switch & RBAC Checks
+   * 4. Dynamic Policy Rules Engine
+   * 
+   * @param data The evaluation payload including the intent, context, and actor.
+   * @param scopedProjectId The active project context to prevent cross-tenant evaluation.
+   * @returns A PolicyDecision object containing the ALLOW, DENY, or REQUIRE_APPROVAL outcome.
+   */
   async evaluateAction(data: EvaluateActionDto, scopedProjectId: string) {
     const policySet = await this.prisma.policySet.findUnique({
       where: { id: data.policySetId },
@@ -167,8 +184,17 @@ export class PolicyService {
         include: { agents: { include: { role: true } } },
       });
 
+      let agent;
       if (identity && identity.agents.length > 0) {
-        const agent = identity.agents[0];
+        agent = identity.agents[0];
+      } else {
+        agent = await this.prisma.agentRecord.findUnique({
+          where: { id: data.actorId },
+          include: { role: true },
+        });
+      }
+
+      if (agent) {
 
         // 1. Kill Switch Check
         if (agent.status === 'SUSPENDED') {
@@ -283,6 +309,27 @@ export class PolicyService {
     });
   }
 
+  async requestApproval(data: { actionIntent: string, context: any, projectId: string, actorId: string, policySetId: string }) {
+    const traceId = randomUUID();
+    const decision = await this.prisma.policyDecision.create({
+      data: {
+        policySetId: data.policySetId,
+        projectId: data.projectId,
+        actionIntent: data.actionIntent,
+        context: this.privacy.redact(data.context) as Prisma.InputJsonValue,
+        outcome: 'REQUIRE_APPROVAL',
+        decisionTrace: { reason: 'Explicit manual approval requested by Agent SDK' } as unknown as Prisma.InputJsonValue,
+        traceId,
+        isSimulation: false,
+      },
+    });
+
+    this.eventsGateway.emitApprovalRequired(decision);
+    this.eventsGateway.emitPolicyIntervention(decision);
+
+    return decision;
+  }
+
   async getPendingApprovals(policySetId: string, scopedProjectId: string) {
     const policySet = await this.getPolicySet(policySetId, scopedProjectId);
     return this.prisma.policyDecision.findMany({
@@ -295,6 +342,15 @@ export class PolicyService {
     });
   }
 
+  /**
+   * Resolves a pending Human-in-the-loop approval.
+   * Modifies the pending REQUIRE_APPROVAL decision into either ALLOW or DENY based on human input.
+   * 
+   * @param decisionId The ID of the pending decision.
+   * @param resolution The final verdict ('ALLOW' or 'DENY').
+   * @param actorId The ID of the admin resolving the decision.
+   * @param scopedProjectId The project scope for security validation.
+   */
   async resolveApproval(
     decisionId: string,
     resolution: 'ALLOW' | 'DENY',

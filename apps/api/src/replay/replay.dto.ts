@@ -15,4 +15,6 @@ export class IngestEventDto {
 
   @IsString()
   projectId!: string;
+
+  parentTraceId?: string;
 }

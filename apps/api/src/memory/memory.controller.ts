@@ -26,4 +26,25 @@ export class MemoryController {
     const scopedProjectId = req.auth?.projectId ?? '';
     return this.memoryService.getMutations(agentId, scopedProjectId);
   }
+
+  @Post('checkpoint')
+  async createCheckpoint(
+    @Body() body: { agentId: string, state: Record<string, unknown> },
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const scopedProjectId = req.auth?.projectId ?? '';
+    return this.memoryService.createCheckpoint({
+      ...body,
+      projectId: scopedProjectId,
+    });
+  }
+
+  @Post('rollback/:id')
+  async rollback(
+    @Param('id') checkpointId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const scopedProjectId = req.auth?.projectId ?? '';
+    return this.memoryService.rollback(checkpointId, scopedProjectId);
+  }
 }

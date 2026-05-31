@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+/**
+ * Model Context Protocol (MCP) Trust Registry.
+ * Cryptographically verifies tool schemas to prevent Supply Chain Attacks in autonomous swarms.
+ */
 @Injectable()
 export class McpTrustService {
   private readonly logger = new Logger(McpTrustService.name);
@@ -40,6 +44,9 @@ export class McpTrustService {
     return true;
   }
 
+  /**
+   * Retrieves all registered MCP tools for a specific project.
+   */
   async getRegistry(projectId: string) {
     return this.prisma.mcpRegistry.findMany({
       where: { projectId },
@@ -47,6 +54,12 @@ export class McpTrustService {
     });
   }
 
+  /**
+   * Registers a new tool in the Enterprise Trust Registry.
+   * 
+   * @param data The tool's name, publisher, and secure cryptographic hash.
+   * @param projectId The isolated project context.
+   */
   async addTool(
     data: { name: string; publisher: string; schemaHash: string },
     projectId: string,
@@ -59,6 +72,9 @@ export class McpTrustService {
     });
   }
 
+  /**
+   * Revokes trust for a compromised or deprecated MCP tool, instantly blocking agent access.
+   */
   async revokeTool(id: string, projectId: string) {
     return this.prisma.mcpRegistry.update({
       where: { id },

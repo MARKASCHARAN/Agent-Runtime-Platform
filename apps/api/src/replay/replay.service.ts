@@ -17,6 +17,7 @@ export class ReplayService {
     payload: Record<string, unknown>;
     actorId: string;
     projectId: string;
+    parentTraceId?: string;
   }) {
     return this.prisma.executionEvent.create({
       data: {
@@ -25,6 +26,7 @@ export class ReplayService {
         payload: this.privacy.redact(data.payload) as Prisma.InputJsonValue,
         actorId: data.actorId,
         projectId: data.projectId,
+        parentTraceId: data.parentTraceId,
       },
     });
   }

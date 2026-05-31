@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, UseGuards, Request } from '@nestjs/common';
 import { ThreatIntelService } from './threat-intel.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -19,5 +19,12 @@ export class ThreatIntelController {
   @Roles('admin', 'approver', 'viewer')
   async getTrustGraph(@Request() req: { auth: { projectId: string } }) {
     return this.threatIntel.getTrustGraph(req.auth.projectId);
+  }
+
+  @Post('verify-prompt')
+  async verifyPrompt(
+    @Request() req: { auth: { projectId: string }; body: { prompt: string } },
+  ) {
+    return this.threatIntel.verifyPrompt(req.body.prompt, req.auth.projectId);
   }
 }

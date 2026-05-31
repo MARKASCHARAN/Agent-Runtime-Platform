@@ -6,6 +6,11 @@ export type DlpViolationResult = {
   count: number;
 };
 
+/**
+ * Data Loss Prevention (DLP) and Privacy Engine.
+ * Scans agent payloads via regex to prevent data exfiltration and automatically
+ * redacts sensitive information (PII, Secrets) from audit logs.
+ */
 @Injectable()
 export class PrivacyService {
   private readonly logger = new Logger(PrivacyService.name);

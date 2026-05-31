@@ -10,6 +10,10 @@ import { assertProjectScope } from '../common/project-scope';
 import { Roles } from '../auth/roles.decorator';
 import { AuditService } from '../audit/audit.service';
 
+/**
+ * REST API Controller for managing Zero-Trust Policy Sets and evaluating Agent intents.
+ * Exposed endpoints are protected by project scoping and RBAC roles.
+ */
 @Controller('policy')
 export class PolicyController {
   constructor(
@@ -55,6 +59,13 @@ export class PolicyController {
     return this.policyService.getPolicySet(id, scopedProjectId);
   }
 
+  /**
+   * Evaluates a proposed agent intent against the configured Policy Set.
+   * If `simulate` is true, no audit logs or interventions are generated.
+   * 
+   * @param body Payload containing intent, context, and actor ID.
+   * @param req The authenticated request injecting project boundaries.
+   */
   @Post('evaluate')
   async evaluateAction(
     @Body() body: EvaluateActionDto,
@@ -96,6 +107,26 @@ export class PolicyController {
     return this.policyService.getPendingApprovals(id, scopedProjectId);
   }
 
+  @Post('decisions/request')
+  async requestApproval(
+    @Body() body: { actionIntent: string, context: any, policySetId: string, actorId: string },
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const scopedProjectId = req.auth?.projectId ?? '';
+    return this.policyService.requestApproval({
+      ...body,
+      projectId: scopedProjectId,
+    });
+  }
+
+  /**
+   * Resolves a pending human-in-the-loop decision (APPROVE or REJECT).
+   * Restricted to admin/approver roles.
+   * 
+   * @param id The pending decision ID.
+   * @param body The resolution outcome.
+   * @param req The authenticated request capturing the acting admin's identity.
+   */
   @Post('decisions/:id/resolve')
   @Roles('admin', 'approver')
   async resolveApproval(

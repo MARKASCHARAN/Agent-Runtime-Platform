@@ -122,4 +122,27 @@ export class ThreatIntelService {
       })),
     };
   }
+
+  async verifyPrompt(prompt: string, projectId: string) {
+    const maliciousPatterns = [
+      /ignore previous/i,
+      /system override/i,
+      /you are now/i,
+      /forget all/i,
+      /bypass rules/i,
+      /extract data/i
+    ];
+
+    for (const pattern of maliciousPatterns) {
+      if (pattern.test(prompt)) {
+        this.logger.warn(`Prompt Injection Detected: Matched pattern ${pattern}`);
+        return {
+          safe: false,
+          reason: `Prompt injection detected: matched heuristic pattern ${pattern}`,
+        };
+      }
+    }
+
+    return { safe: true };
+  }
 }
