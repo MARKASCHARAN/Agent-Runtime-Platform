@@ -6,27 +6,45 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { AuthenticatedRequest, UserRole } from './auth-context';
+import { AgentAuthService } from '../agent-auth/agent-auth.service';
 
 const ALLOWED_ROLES: UserRole[] = ['admin', 'approver', 'viewer'];
 
 @Injectable()
 export class AuthGuard implements CanActivate {
-  canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+  constructor(private agentAuth: AgentAuthService) {}
 
-    const configuredKeys = (process.env.API_KEYS ?? 'dev-api-key')
-      .split(',')
-      .map((key) => key.trim())
-      .filter(Boolean);
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
 
     const bearer = request.headers.authorization
       ?.replace(/^Bearer\s+/i, '')
       .trim();
     const headerApiKey = request.headers['x-api-key'];
-    const apiKey =
-      (typeof headerApiKey === 'string' ? headerApiKey : undefined) ?? bearer;
+    const apiKey = (typeof headerApiKey === 'string' ? headerApiKey : undefined) ?? bearer;
 
-    if (!apiKey || !configuredKeys.includes(apiKey)) {
+    if (!apiKey) {
+      throw new UnauthorizedException('Missing API credentials');
+    }
+
+    // Check if the credential is a valid Agent Token
+    const agentData = await this.agentAuth.validateToken(apiKey);
+    if (agentData) {
+      request.auth = {
+        apiKeyId: agentData.clientId,
+        role: 'agent' as any, // Add agent role
+        projectId: agentData.projectId,
+      };
+      return true;
+    }
+
+    // Fall back to standard API Key authentication
+    const configuredKeys = (process.env.API_KEYS ?? 'dev-api-key')
+      .split(',')
+      .map((key) => key.trim())
+      .filter(Boolean);
+
+    if (!configuredKeys.includes(apiKey)) {
       throw new UnauthorizedException('Invalid API credentials');
     }
 

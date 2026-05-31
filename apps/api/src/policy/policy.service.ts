@@ -33,11 +33,14 @@ interface EvaluationResult {
   trace: RuleTrace[];
 }
 
+import { PrivacyService } from '../privacy/privacy.service';
+
 @Injectable()
 export class PolicyService {
   constructor(
     private prisma: PrismaService,
     private eventsGateway: EventsGateway,
+    private privacy: PrivacyService,
   ) {}
 
   async createPolicySet(data: CreatePolicySetDto) {
@@ -118,7 +121,7 @@ export class PolicyService {
         policySetId: data.policySetId,
         projectId: policySet.projectId,
         actionIntent: data.actionIntent,
-        context: data.context as Prisma.InputJsonValue,
+        context: this.privacy.redact(data.context) as Prisma.InputJsonValue,
         outcome: evaluation.outcome,
         decisionTrace: decisionTrace as unknown as Prisma.InputJsonValue,
         traceId,

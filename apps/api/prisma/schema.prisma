@@ -16,7 +16,7 @@ model PolicySet {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  decisions   PolicyDecision[]
+  decisions PolicyDecision[]
 
   @@index([projectId, createdAt])
 }
@@ -84,4 +84,36 @@ model MemoryMutation {
 
   @@index([projectId, createdAt])
   @@index([agentId, createdAt])
+}
+
+model WebhookConfig {
+  id        String   @id @default(uuid())
+  url       String
+  secret    String
+  events    String // Comma-separated list of events: 'POLICY_DECISION,MEMORY_ANOMALY'
+  projectId String
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+}
+
+model AgentIdentity {
+  id           String   @id @default(uuid())
+  clientId     String   @unique
+  hashedSecret String
+  scopes       String // Comma-separated list of scopes, e.g., 'mcp:read,policy:evaluate'
+  projectId    String
+  createdAt    DateTime @default(now())
+
+  tokens AgentToken[]
+}
+
+model AgentToken {
+  id              String   @id @default(uuid())
+  agentIdentityId String
+  token           String   @unique
+  expiresAt       DateTime
+  createdAt       DateTime @default(now())
+
+  agentIdentity AgentIdentity @relation(fields: [agentIdentityId], references: [id])
 }

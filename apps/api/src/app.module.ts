@@ -12,6 +12,9 @@ import { EventsModule } from './events/events.module';
 import { AuthGuard } from './auth/auth.guard';
 import { RolesGuard } from './auth/roles.guard';
 import { AuditModule } from './audit/audit.module';
+import { PrivacyModule } from './privacy/privacy.module';
+import { IntegrationsModule } from './integrations/integrations.module';
+import { AgentAuthModule } from './agent-auth/agent-auth.module';
 
 @Module({
   imports: [
@@ -23,6 +26,9 @@ import { AuditModule } from './audit/audit.module';
     ComplianceModule,
     EventsModule,
     AuditModule,
+    PrivacyModule,
+    IntegrationsModule,
+    AgentAuthModule,
   ],
   controllers: [AppController],
   providers: [

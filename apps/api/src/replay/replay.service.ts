@@ -2,9 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
+import { PrivacyService } from '../privacy/privacy.service';
+
 @Injectable()
 export class ReplayService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private privacy: PrivacyService,
+  ) {}
 
   async ingestEvent(data: {
     replayCorrelationId: string;
@@ -17,7 +22,7 @@ export class ReplayService {
       data: {
         replayCorrelationId: data.replayCorrelationId,
         eventType: data.eventType,
-        payload: data.payload as Prisma.InputJsonValue,
+        payload: this.privacy.redact(data.payload) as Prisma.InputJsonValue,
         actorId: data.actorId,
         projectId: data.projectId,
       },
