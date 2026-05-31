@@ -177,3 +177,15 @@ model McpRegistry {
 
   @@index([projectId, name])
 }
+
+model DlpViolation {
+  id            String   @id @default(uuid())
+  agentRecordId String? // Optional if the agent isn't fully identified, but usually present
+  intentName    String
+  violationType String // e.g., 'CREDIT_CARD', 'AWS_SECRET'
+  severity      String // 'HIGH', 'MEDIUM', 'LOW'
+  projectId     String
+  createdAt     DateTime @default(now())
+
+  @@index([projectId, createdAt])
+}

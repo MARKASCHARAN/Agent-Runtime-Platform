@@ -97,8 +97,38 @@ export class PolicyService {
     let preEvaluationOutcome: PolicyOutcome | null = null;
     let preEvaluationReason = '';
 
+    // Phase 5: Active Data Loss Prevention (DLP)
+    const dlpViolations = this.privacy.scanForViolations(data.context);
+    const highSeverityViolation = dlpViolations.find(v => v.severity === 'HIGH');
+    
+    if (highSeverityViolation) {
+      preEvaluationOutcome = 'DENY';
+      preEvaluationReason = `DLP Block: High-severity data exfiltration attempt detected (${highSeverityViolation.type}).`;
+      
+      // Async record the DLP violation
+      if (data.actorId && !data.simulate) {
+        this.prisma.agentIdentity.findUnique({ where: { clientId: data.actorId }, include: { agents: true } }).then(identity => {
+          const agentId = identity?.agents[0]?.id;
+          if (agentId) {
+            this.prisma.dlpViolation.create({
+              data: {
+                agentRecordId: agentId,
+                intentName: data.actionIntent,
+                violationType: highSeverityViolation.type,
+                severity: highSeverityViolation.severity,
+                projectId: scopedProjectId,
+              }
+            }).catch(console.error);
+
+            // Trigger Threat Intel to increase risk score for exfiltration
+            this.threatIntel.recordThreat(data.actorId as string, `DLP EXFILTRATION: ${highSeverityViolation.type}`, scopedProjectId).catch(console.error);
+          }
+        }).catch(console.error);
+      }
+    }
+
     // Phase 4: Zero Trust MCP Verification
-    if (data.context && typeof data.context.toolHash === 'string') {
+    if (!preEvaluationOutcome && data.context && typeof data.context.toolHash === 'string') {
       const isTrusted = await this.mcpTrust.verifyTool(data.actionIntent, data.context.toolHash, scopedProjectId);
       if (!isTrusted) {
         preEvaluationOutcome = 'DENY';
