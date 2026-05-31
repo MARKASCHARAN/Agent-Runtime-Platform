@@ -1,39 +1,29 @@
-import { Body, Controller, Get, Post, Req } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, UseGuards, Request } from '@nestjs/common';
 import { McpTrustService } from './mcp-trust.service';
-import { RegisterToolDto, VerifyToolDto } from './mcp-trust.dto';
+import { AuthGuard } from '../auth/auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import type { AuthenticatedRequest } from '../auth/auth-context';
 
-@Controller('mcp-trust')
+@Controller('mcp')
+@UseGuards(AuthGuard, RolesGuard)
 export class McpTrustController {
-  constructor(private readonly trustService: McpTrustService) {}
+  constructor(private mcpTrust: McpTrustService) {}
 
-  @Post('register')
+  @Get('registry')
+  @Roles('admin', 'approver', 'viewer')
+  async getRegistry(@Request() req: any) {
+    return this.mcpTrust.getRegistry(req.auth.projectId);
+  }
+
+  @Post('registry')
   @Roles('admin')
-  async registerTool(
-    @Body() body: RegisterToolDto,
-    @Req() req: AuthenticatedRequest,
-  ) {
-    const projectId = req.auth?.projectId ?? '';
-    return this.trustService.registerTool({ ...body, projectId });
+  async addTool(@Body() body: { name: string; publisher: string; schemaHash: string }, @Request() req: any) {
+    return this.mcpTrust.addTool(body, req.auth.projectId);
   }
 
-  @Post('verify')
-  async verifyTool(
-    @Body() body: VerifyToolDto,
-    @Req() req: AuthenticatedRequest,
-  ) {
-    const projectId = req.auth?.projectId ?? '';
-    return this.trustService.verifyTool(
-      body.toolIdentity,
-      body.schemaHash,
-      projectId,
-    );
-  }
-
-  @Get('profiles')
-  async getTrustProfiles(@Req() req: AuthenticatedRequest) {
-    const projectId = req.auth?.projectId ?? '';
-    return this.trustService.getTrustProfiles(projectId);
+  @Patch('registry/:id/revoke')
+  @Roles('admin')
+  async revokeTool(@Param('id') id: string, @Request() req: any) {
+    return this.mcpTrust.revokeTool(id, req.auth.projectId);
   }
 }

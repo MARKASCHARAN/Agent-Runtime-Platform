@@ -89,6 +89,26 @@ async function main() {
     },
   });
 
+  await prisma.mcpRegistry.deleteMany();
+
+  await prisma.mcpRegistry.create({
+    data: {
+      name: 'transfer_funds',
+      publisher: 'Enterprise Core Banking',
+      schemaHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', // Sha256 mock
+      projectId: 'proj_123',
+    },
+  });
+
+  await prisma.mcpRegistry.create({
+    data: {
+      name: 'read_balance',
+      publisher: 'Enterprise Core Banking',
+      schemaHash: '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8', // Sha256 mock
+      projectId: 'proj_123',
+    },
+  });
+
   console.log('Seeding complete!');
 }
 

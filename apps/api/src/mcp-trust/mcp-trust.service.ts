@@ -1,67 +1,57 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class McpTrustService {
+  private readonly logger = new Logger(McpTrustService.name);
+
   constructor(private prisma: PrismaService) {}
 
-  async registerTool(data: {
-    toolIdentity: string;
-    publisher: string;
-    schemaHash: string;
-    projectId: string;
-  }) {
-    return this.prisma.toolTrustProfile.upsert({
+  /**
+   * Verifies if a tool and its schema hash are approved in the enterprise registry.
+   */
+  async verifyTool(name: string, schemaHash: string, projectId: string): Promise<boolean> {
+    const registryEntry = await this.prisma.mcpRegistry.findFirst({
       where: {
-        toolIdentity_projectId: {
-          toolIdentity: data.toolIdentity,
-          projectId: data.projectId,
-        },
-      },
-      update: { publisher: data.publisher, schemaHash: data.schemaHash },
-      create: {
-        toolIdentity: data.toolIdentity,
-        publisher: data.publisher,
-        schemaHash: data.schemaHash,
-        trustStatus: 'UNVERIFIED',
-        projectId: data.projectId,
-      },
-    });
-  }
-
-  async verifyTool(
-    toolIdentity: string,
-    schemaHash: string,
-    projectId: string,
-  ) {
-    const profile = await this.prisma.toolTrustProfile.findUnique({
-      where: {
-        toolIdentity_projectId: {
-          toolIdentity,
-          projectId,
-        },
+        name,
+        projectId,
+        status: 'APPROVED',
       },
     });
 
-    if (!profile) {
-      return { allowed: false, reason: 'TOOL_UNKNOWN' };
+    if (!registryEntry) {
+      this.logger.warn(`MCP Verification Failed: Tool '${name}' is not in the approved registry.`);
+      return false;
     }
 
-    if (profile.trustStatus === 'UNTRUSTED') {
-      return { allowed: false, reason: 'TOOL_UNTRUSTED' };
+    if (registryEntry.schemaHash !== schemaHash) {
+      this.logger.error(`MCP Verification Failed: Tool '${name}' hash mismatch! Expected ${registryEntry.schemaHash}, got ${schemaHash}. Possible supply chain attack.`);
+      return false;
     }
 
-    if (profile.schemaHash !== schemaHash) {
-      return { allowed: false, reason: 'SCHEMA_MISMATCH' };
-    }
-
-    return { allowed: true, reason: 'VERIFIED' };
+    return true;
   }
 
-  async getTrustProfiles(projectId: string) {
-    return this.prisma.toolTrustProfile.findMany({
+  async getRegistry(projectId: string) {
+    return this.prisma.mcpRegistry.findMany({
       where: { projectId },
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async addTool(data: { name: string; publisher: string; schemaHash: string }, projectId: string) {
+    return this.prisma.mcpRegistry.create({
+      data: {
+        ...data,
+        projectId,
+      },
+    });
+  }
+
+  async revokeTool(id: string, projectId: string) {
+    return this.prisma.mcpRegistry.update({
+      where: { id },
+      data: { status: 'REVOKED' },
     });
   }
 }

@@ -164,3 +164,16 @@ model ThreatEvent {
 
   @@index([projectId, agentRecordId])
 }
+
+model McpRegistry {
+  id         String   @id @default(uuid())
+  name       String // The intent or tool name, e.g., 'github_mcp_create_repo'
+  publisher  String // e.g., 'GitHub', 'Internal', 'Stripe'
+  schemaHash String // Cryptographic SHA256 of the exact tool schema
+  status     String   @default("APPROVED") // 'APPROVED', 'REVOKED'
+  projectId  String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([projectId, name])
+}

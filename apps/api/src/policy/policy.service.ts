@@ -36,6 +36,7 @@ interface EvaluationResult {
 import { PrivacyService } from '../privacy/privacy.service';
 import { AgentInventoryService } from '../agent-inventory/agent-inventory.service';
 import { ThreatIntelService } from '../threat-intel/threat-intel.service';
+import { McpTrustService } from '../mcp-trust/mcp-trust.service';
 
 @Injectable()
 export class PolicyService {
@@ -45,6 +46,7 @@ export class PolicyService {
     private privacy: PrivacyService,
     private agentInventory: AgentInventoryService,
     private threatIntel: ThreatIntelService,
+    private mcpTrust: McpTrustService,
   ) {}
 
   async createPolicySet(data: CreatePolicySetDto) {
@@ -95,7 +97,16 @@ export class PolicyService {
     let preEvaluationOutcome: PolicyOutcome | null = null;
     let preEvaluationReason = '';
 
-    if (data.actorId) {
+    // Phase 4: Zero Trust MCP Verification
+    if (data.context && typeof data.context.toolHash === 'string') {
+      const isTrusted = await this.mcpTrust.verifyTool(data.actionIntent, data.context.toolHash, scopedProjectId);
+      if (!isTrusted) {
+        preEvaluationOutcome = 'DENY';
+        preEvaluationReason = `MCP Verification Failed: Tool hash for '${data.actionIntent}' is not trusted in the enterprise registry (Supply Chain Violation).`;
+      }
+    }
+
+    if (!preEvaluationOutcome && data.actorId) {
       // Find the agent by its associated identity clientId
       const identity = await this.prisma.agentIdentity.findUnique({
         where: { clientId: data.actorId },
