@@ -10,10 +10,22 @@ import { AgentAuthService } from '../agent-auth/agent-auth.service';
 
 const ALLOWED_ROLES: UserRole[] = ['admin', 'approver', 'viewer'];
 
+/**
+ * Global authentication guard.
+ * Validates either an Agent JIT Token or a static API Key.
+ * Injects verified credentials and project scope into the request.
+ */
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(private agentAuth: AgentAuthService) {}
 
+  /**
+   * Evaluates the incoming request headers to determine access.
+   * Extracts API keys or Bearer tokens and validates against the DB or ENV.
+   * 
+   * @param context The execution context provided by NestJS.
+   * @returns True if authenticated, throws UnauthorizedException/ForbiddenException otherwise.
+   */
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
 

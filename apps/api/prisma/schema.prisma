@@ -49,6 +49,7 @@ model ExecutionEvent {
   actorId             String
   projectId           String
   traceId             String?
+  parentTraceId       String?
   createdAt           DateTime @default(now())
 
   @@index([projectId, createdAt])
@@ -188,4 +189,29 @@ model DlpViolation {
   createdAt     DateTime @default(now())
 
   @@index([projectId, createdAt])
+}
+
+model AgentCheckpoint {
+  id        String   @id @default(uuid())
+  agentId   String
+  state     Json
+  projectId String
+  createdAt DateTime @default(now())
+
+  @@index([projectId, createdAt])
+  @@index([agentId, createdAt])
+}
+
+model AgentJitToken {
+  id        String   @id @default(uuid())
+  agentId   String
+  tool      String
+  scope     String
+  token     String   @unique
+  expiresAt DateTime
+  projectId String
+  createdAt DateTime @default(now())
+
+  @@index([agentId, createdAt])
+  @@index([projectId])
 }

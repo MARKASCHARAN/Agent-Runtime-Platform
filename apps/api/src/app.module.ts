@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
+
 import { PrismaModule } from './prisma/prisma.module';
 import { PolicyModule } from './policy/policy.module';
 import { ReplayModule } from './replay/replay.module';
@@ -17,6 +16,7 @@ import { IntegrationsModule } from './integrations/integrations.module';
 import { AgentAuthModule } from './agent-auth/agent-auth.module';
 import { AgentInventoryModule } from './agent-inventory/agent-inventory.module';
 import { ThreatIntelModule } from './threat-intel/threat-intel.module';
+import { IdentityModule } from './identity/identity.module';
 
 @Module({
   imports: [
@@ -33,10 +33,10 @@ import { ThreatIntelModule } from './threat-intel/threat-intel.module';
     AgentAuthModule,
     AgentInventoryModule,
     ThreatIntelModule,
+    IdentityModule,
   ],
-  controllers: [AppController],
+  controllers: [],
   providers: [
-    AppService,
     {
       provide: APP_GUARD,
       useClass: AuthGuard,
