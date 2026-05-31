@@ -8,6 +8,8 @@ The **Agent Runtime Security Platform** acts as the SOC (Security Operations Cen
 ## ✨ Core Capabilities
 
 - **Runtime Policy Engine**: Dynamically block, warn, or pause agent intents (e.g., `DANGEROUS_DB_DROP`, `SENSITIVE_API_CALL`) before they execute.
+- **Agent Governance & RBAC**: Maintain a structural inventory of your AI workforce. Bind agents to specific roles, restricting their intents intrinsically before hitting the policy engine.
+- **Active Defense (Auto-Quarantine)**: Continuous threat intelligence monitoring. If an agent triggers multiple blocked actions, the platform autonomously engages a global kill switch (`SUSPENDED`) to stop catastrophic actions.
 - **Human-in-the-Loop Governance**: Suspends execution on high-risk actions and streams a `REQUIRE_APPROVAL` event to the central dashboard for manual authorization.
 - **MCP Trust & Verification**: Cryptographically verify the schema hash and publisher trust profile of external Model Context Protocol (MCP) tools before the agent is allowed to invoke them.
 - **Memory Integrity**: A ledger that tracks agentic memory mutations to detect prompt-injection attacks and dangerous memory bloat.
