@@ -134,18 +134,33 @@ model AgentRole {
 }
 
 model AgentRecord {
-  id              String   @id @default(uuid())
-  name            String
-  description     String?
-  status          String   @default("ACTIVE") // 'ACTIVE', 'SUSPENDED', 'RETIRED'
-  agentIdentityId String?
-  roleId          String?
-  projectId       String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id               String   @id @default(uuid())
+  name             String
+  description      String?
+  status           String   @default("ACTIVE") // 'ACTIVE', 'SUSPENDED', 'RETIRED'
+  currentRiskScore Int      @default(0)
+  agentIdentityId  String?
+  roleId           String?
+  projectId        String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   role          AgentRole?     @relation(fields: [roleId], references: [id])
   agentIdentity AgentIdentity? @relation(fields: [agentIdentityId], references: [id])
+  threatEvents  ThreatEvent[]
 
   @@index([projectId, status])
+}
+
+model ThreatEvent {
+  id            String   @id @default(uuid())
+  agentRecordId String
+  reason        String
+  riskDelta     Int
+  projectId     String
+  createdAt     DateTime @default(now())
+
+  agent AgentRecord @relation(fields: [agentRecordId], references: [id])
+
+  @@index([projectId, agentRecordId])
 }

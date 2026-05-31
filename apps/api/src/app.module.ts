@@ -16,6 +16,7 @@ import { PrivacyModule } from './privacy/privacy.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { AgentAuthModule } from './agent-auth/agent-auth.module';
 import { AgentInventoryModule } from './agent-inventory/agent-inventory.module';
+import { ThreatIntelModule } from './threat-intel/threat-intel.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { AgentInventoryModule } from './agent-inventory/agent-inventory.module';
     IntegrationsModule,
     AgentAuthModule,
     AgentInventoryModule,
+    ThreatIntelModule,
   ],
   controllers: [AppController],
   providers: [

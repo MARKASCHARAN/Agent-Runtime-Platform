@@ -35,6 +35,7 @@ interface EvaluationResult {
 
 import { PrivacyService } from '../privacy/privacy.service';
 import { AgentInventoryService } from '../agent-inventory/agent-inventory.service';
+import { ThreatIntelService } from '../threat-intel/threat-intel.service';
 
 @Injectable()
 export class PolicyService {
@@ -43,6 +44,7 @@ export class PolicyService {
     private eventsGateway: EventsGateway,
     private privacy: PrivacyService,
     private agentInventory: AgentInventoryService,
+    private threatIntel: ThreatIntelService,
   ) {}
 
   async createPolicySet(data: CreatePolicySetDto) {
@@ -182,6 +184,13 @@ export class PolicyService {
     }
 
     this.eventsGateway.emitPolicyIntervention(decision);
+
+    if (decision.outcome === 'DENY' && data.actorId && !data.simulate) {
+      // Async so we don't block the decision
+      this.threatIntel.recordThreat(data.actorId, data.actionIntent, policySet.projectId).catch(err => {
+        console.error('Failed to record threat', err);
+      });
+    }
 
     return decision;
   }
