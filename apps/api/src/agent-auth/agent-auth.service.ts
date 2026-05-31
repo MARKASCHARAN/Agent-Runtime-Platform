@@ -15,7 +15,10 @@ export class AgentAuthService {
       throw new UnauthorizedException('Invalid client credentials');
     }
 
-    const hashedSecret = crypto.createHash('sha256').update(clientSecret).digest('hex');
+    const hashedSecret = crypto
+      .createHash('sha256')
+      .update(clientSecret)
+      .digest('hex');
     if (hashedSecret !== identity.hashedSecret) {
       throw new UnauthorizedException('Invalid client credentials');
     }

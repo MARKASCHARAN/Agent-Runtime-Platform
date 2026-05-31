@@ -14,14 +14,26 @@ export class AgentInventoryService {
     });
   }
 
-  async createAgent(projectId: string, data: { name: string; description?: string; roleId?: string; agentIdentityId?: string }) {
+  async createAgent(
+    projectId: string,
+    data: {
+      name: string;
+      description?: string;
+      roleId?: string;
+      agentIdentityId?: string;
+    },
+  ) {
     if (data.roleId) {
-      const role = await this.prisma.agentRole.findUnique({ where: { id: data.roleId } });
+      const role = await this.prisma.agentRole.findUnique({
+        where: { id: data.roleId },
+      });
       if (!role) throw new NotFoundException('Role not found');
       assertProjectScope(projectId, role.projectId);
     }
     if (data.agentIdentityId) {
-      const identity = await this.prisma.agentIdentity.findUnique({ where: { id: data.agentIdentityId } });
+      const identity = await this.prisma.agentIdentity.findUnique({
+        where: { id: data.agentIdentityId },
+      });
       if (!identity) throw new NotFoundException('Identity not found');
       assertProjectScope(projectId, identity.projectId);
     }
@@ -48,7 +60,11 @@ export class AgentInventoryService {
     return agent;
   }
 
-  async updateStatus(id: string, status: 'ACTIVE' | 'SUSPENDED' | 'RETIRED', projectId: string) {
+  async updateStatus(
+    id: string,
+    status: 'ACTIVE' | 'SUSPENDED' | 'RETIRED',
+    projectId: string,
+  ) {
     const agent = await this.getAgent(id, projectId);
     return this.prisma.agentRecord.update({
       where: { id: agent.id },

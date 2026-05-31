@@ -10,7 +10,11 @@ export class McpTrustService {
   /**
    * Verifies if a tool and its schema hash are approved in the enterprise registry.
    */
-  async verifyTool(name: string, schemaHash: string, projectId: string): Promise<boolean> {
+  async verifyTool(
+    name: string,
+    schemaHash: string,
+    projectId: string,
+  ): Promise<boolean> {
     const registryEntry = await this.prisma.mcpRegistry.findFirst({
       where: {
         name,
@@ -20,12 +24,16 @@ export class McpTrustService {
     });
 
     if (!registryEntry) {
-      this.logger.warn(`MCP Verification Failed: Tool '${name}' is not in the approved registry.`);
+      this.logger.warn(
+        `MCP Verification Failed: Tool '${name}' is not in the approved registry.`,
+      );
       return false;
     }
 
     if (registryEntry.schemaHash !== schemaHash) {
-      this.logger.error(`MCP Verification Failed: Tool '${name}' hash mismatch! Expected ${registryEntry.schemaHash}, got ${schemaHash}. Possible supply chain attack.`);
+      this.logger.error(
+        `MCP Verification Failed: Tool '${name}' hash mismatch! Expected ${registryEntry.schemaHash}, got ${schemaHash}. Possible supply chain attack.`,
+      );
       return false;
     }
 
@@ -39,7 +47,10 @@ export class McpTrustService {
     });
   }
 
-  async addTool(data: { name: string; publisher: string; schemaHash: string }, projectId: string) {
+  async addTool(
+    data: { name: string; publisher: string; schemaHash: string },
+    projectId: string,
+  ) {
     return this.prisma.mcpRegistry.create({
       data: {
         ...data,

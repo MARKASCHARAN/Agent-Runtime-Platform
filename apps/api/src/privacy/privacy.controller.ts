@@ -11,7 +11,7 @@ export class PrivacyController {
 
   @Get('dlp/violations')
   @Roles('admin', 'approver', 'viewer')
-  async getDlpViolations(@Request() req: any) {
+  async getDlpViolations(@Request() req: { auth: { projectId: string } }) {
     return this.prisma.dlpViolation.findMany({
       where: { projectId: req.auth.projectId },
       orderBy: { createdAt: 'desc' },

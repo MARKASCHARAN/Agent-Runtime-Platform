@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Patch, Body, Param, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Param,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { AgentInventoryService } from './agent-inventory.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -11,31 +20,34 @@ export class AgentInventoryController {
 
   @Get('agents')
   @Roles('admin', 'approver', 'viewer')
-  async listAgents(@Request() req: any) {
+  async listAgents(@Request() req: { auth: { projectId: string } }) {
     return this.inventory.listAgents(req.auth.projectId);
   }
 
   @Post('agents')
   @Roles('admin')
-  async createAgent(@Request() req: any, @Body() body: any) {
+  async createAgent(
+    @Body() body: { name: string; description?: string; roleId?: string; agentIdentityId?: string },
+    @Request() req: { auth: { projectId: string } },
+  ) {
     return this.inventory.createAgent(req.auth.projectId, body);
   }
 
   @Patch('agents/:id/suspend')
   @Roles('admin', 'approver')
-  async suspendAgent(@Request() req: any, @Param('id') id: string) {
+  async suspendAgent(@Param('id') id: string, @Request() req: { auth: { projectId: string } }) {
     return this.inventory.updateStatus(id, 'SUSPENDED', req.auth.projectId);
   }
 
   @Patch('agents/:id/activate')
   @Roles('admin', 'approver')
-  async activateAgent(@Request() req: any, @Param('id') id: string) {
+  async activateAgent(@Param('id') id: string, @Request() req: { auth: { projectId: string } }) {
     return this.inventory.updateStatus(id, 'ACTIVE', req.auth.projectId);
   }
 
   @Get('roles')
   @Roles('admin', 'approver', 'viewer')
-  async listRoles(@Request() req: any) {
+  async listRoles(@Request() req: { auth: { projectId: string } }) {
     return this.inventory.listRoles(req.auth.projectId);
   }
 }

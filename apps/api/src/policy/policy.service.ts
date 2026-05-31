@@ -99,37 +99,61 @@ export class PolicyService {
 
     // Phase 5: Active Data Loss Prevention (DLP)
     const dlpViolations = this.privacy.scanForViolations(data.context);
-    const highSeverityViolation = dlpViolations.find(v => v.severity === 'HIGH');
-    
+    const highSeverityViolation = dlpViolations.find(
+      (v) => v.severity === 'HIGH',
+    );
+
     if (highSeverityViolation) {
       preEvaluationOutcome = 'DENY';
       preEvaluationReason = `DLP Block: High-severity data exfiltration attempt detected (${highSeverityViolation.type}).`;
-      
+
       // Async record the DLP violation
       if (data.actorId && !data.simulate) {
-        this.prisma.agentIdentity.findUnique({ where: { clientId: data.actorId }, include: { agents: true } }).then(identity => {
-          const agentId = identity?.agents[0]?.id;
-          if (agentId) {
-            this.prisma.dlpViolation.create({
-              data: {
-                agentRecordId: agentId,
-                intentName: data.actionIntent,
-                violationType: highSeverityViolation.type,
-                severity: highSeverityViolation.severity,
-                projectId: scopedProjectId,
-              }
-            }).catch(console.error);
+        this.prisma.agentIdentity
+          .findUnique({
+            where: { clientId: data.actorId },
+            include: { agents: true },
+          })
+          .then((identity) => {
+            const agentId = identity?.agents[0]?.id;
+            if (agentId) {
+              this.prisma.dlpViolation
+                .create({
+                  data: {
+                    agentRecordId: agentId,
+                    intentName: data.actionIntent,
+                    violationType: highSeverityViolation.type,
+                    severity: highSeverityViolation.severity,
+                    projectId: scopedProjectId,
+                  },
+                })
+                .catch(console.error);
 
-            // Trigger Threat Intel to increase risk score for exfiltration
-            this.threatIntel.recordThreat(data.actorId as string, `DLP EXFILTRATION: ${highSeverityViolation.type}`, scopedProjectId).catch(console.error);
-          }
-        }).catch(console.error);
+              // Trigger Threat Intel to increase risk score for exfiltration
+              this.threatIntel
+                .recordThreat(
+                  data.actorId as string,
+                  `DLP EXFILTRATION: ${highSeverityViolation.type}`,
+                  scopedProjectId,
+                )
+                .catch(console.error);
+            }
+          })
+          .catch(console.error);
       }
     }
 
     // Phase 4: Zero Trust MCP Verification
-    if (!preEvaluationOutcome && data.context && typeof data.context.toolHash === 'string') {
-      const isTrusted = await this.mcpTrust.verifyTool(data.actionIntent, data.context.toolHash, scopedProjectId);
+    if (
+      !preEvaluationOutcome &&
+      data.context &&
+      typeof data.context.toolHash === 'string'
+    ) {
+      const isTrusted = await this.mcpTrust.verifyTool(
+        data.actionIntent,
+        data.context.toolHash,
+        scopedProjectId,
+      );
       if (!isTrusted) {
         preEvaluationOutcome = 'DENY';
         preEvaluationReason = `MCP Verification Failed: Tool hash for '${data.actionIntent}' is not trusted in the enterprise registry (Supply Chain Violation).`;
@@ -145,15 +169,18 @@ export class PolicyService {
 
       if (identity && identity.agents.length > 0) {
         const agent = identity.agents[0];
-        
+
         // 1. Kill Switch Check
         if (agent.status === 'SUSPENDED') {
           preEvaluationOutcome = 'DENY';
-          preEvaluationReason = 'Agent is globally suspended (Kill Switch engaged).';
-        } 
+          preEvaluationReason =
+            'Agent is globally suspended (Kill Switch engaged).';
+        }
         // 2. RBAC Intent Check
         else if (agent.role && agent.role.allowedIntents !== '*') {
-          const allowedIntents = agent.role.allowedIntents.split(',').map(i => i.trim());
+          const allowedIntents = agent.role.allowedIntents
+            .split(',')
+            .map((i) => i.trim());
           if (!allowedIntents.includes(data.actionIntent)) {
             preEvaluationOutcome = 'DENY';
             preEvaluationReason = `Intent '${data.actionIntent}' is not allowed for role '${agent.role.name}'.`;
@@ -164,18 +191,28 @@ export class PolicyService {
 
     const normalizedRules = policySet.rules as unknown as PolicyRulesDto;
     const traceId = data.traceId ?? randomUUID();
-    
+
     let evaluation: EvaluationResult;
     if (preEvaluationOutcome) {
       evaluation = {
         outcome: preEvaluationOutcome,
         matchedRuleIds: ['intrinsic-rbac'],
-        trace: [{
-          id: 'intrinsic-rbac',
-          effect: preEvaluationOutcome,
-          matched: true,
-          conditions: [{ field: 'agent.role', operator: 'intrinsic', expected: 'allowed', actual: preEvaluationReason, matched: false }]
-        }]
+        trace: [
+          {
+            id: 'intrinsic-rbac',
+            effect: preEvaluationOutcome,
+            matched: true,
+            conditions: [
+              {
+                field: 'agent.role',
+                operator: 'intrinsic',
+                expected: 'allowed',
+                actual: preEvaluationReason,
+                matched: false,
+              },
+            ],
+          },
+        ],
       };
     } else {
       evaluation = this.evaluateRules(
@@ -228,9 +265,11 @@ export class PolicyService {
 
     if (decision.outcome === 'DENY' && data.actorId && !data.simulate) {
       // Async so we don't block the decision
-      this.threatIntel.recordThreat(data.actorId, data.actionIntent, policySet.projectId).catch(err => {
-        console.error('Failed to record threat', err);
-      });
+      this.threatIntel
+        .recordThreat(data.actorId, data.actionIntent, policySet.projectId)
+        .catch((err) => {
+          console.error('Failed to record threat', err);
+        });
     }
 
     return decision;

@@ -24,17 +24,29 @@ export class EventsGateway implements OnGatewayInit {
 
   emitPolicyIntervention(payload: any) {
     this.server.emit('policy.intervention', payload);
-    this.integrations.dispatchWebhook(payload.projectId || 'default', 'POLICY_DECISION', payload);
+    this.integrations.dispatchWebhook(
+      payload.projectId || 'default',
+      'POLICY_DECISION',
+      payload,
+    );
   }
 
   emitApprovalRequired(payload: any) {
     this.server.emit('approval.required', payload);
-    this.integrations.dispatchWebhook(payload.projectId || 'default', 'REQUIRE_APPROVAL', payload);
+    this.integrations.dispatchWebhook(
+      payload.projectId || 'default',
+      'REQUIRE_APPROVAL',
+      payload,
+    );
   }
 
   emitMemoryAnomaly(payload: any) {
     this.server.emit('memory.anomaly', payload);
-    this.integrations.dispatchWebhook(payload.projectId || 'default', 'MEMORY_ANOMALY', payload);
+    this.integrations.dispatchWebhook(
+      payload.projectId || 'default',
+      'MEMORY_ANOMALY',
+      payload,
+    );
   }
 
   emitReplayReady(payload: any) {

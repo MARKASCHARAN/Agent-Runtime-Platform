@@ -38,7 +38,7 @@ export class ThreatIntelService {
     });
 
     const newScore = agent.currentRiskScore + riskDelta;
-    
+
     await this.prisma.agentRecord.update({
       where: { id: agent.id },
       data: { currentRiskScore: newScore },
@@ -47,10 +47,16 @@ export class ThreatIntelService {
     this.logger.warn(`Agent ${agent.name} risk increased to ${newScore}`);
 
     // Auto-Quarantine Logic
-    if (agent.role && newScore >= agent.role.maxRiskScore && agent.status === 'ACTIVE') {
-      this.logger.error(`[AUTO-QUARANTINE] Agent ${agent.name} exceeded risk threshold ${agent.role.maxRiskScore}. Suspending...`);
+    if (
+      agent.role &&
+      newScore >= agent.role.maxRiskScore &&
+      agent.status === 'ACTIVE'
+    ) {
+      this.logger.error(
+        `[AUTO-QUARANTINE] Agent ${agent.name} exceeded risk threshold ${agent.role.maxRiskScore}. Suspending...`,
+      );
       await this.inventory.updateStatus(agent.id, 'SUSPENDED', projectId);
-      
+
       this.eventsGateway.server.emit('threat.quarantine', {
         agentId: agent.id,
         name: agent.name,
@@ -66,14 +72,17 @@ export class ThreatIntelService {
       where: { projectId },
       orderBy: { currentRiskScore: 'desc' },
       take: 10,
-      include: { role: true, threatEvents: { orderBy: { createdAt: 'desc' }, take: 3 } },
+      include: {
+        role: true,
+        threatEvents: { orderBy: { createdAt: 'desc' }, take: 3 },
+      },
     });
   }
 
   async getTrustGraph(projectId: string) {
     // A primitive version of a Trust Graph.
     // In a real system, this would aggregate decisions from the DB into a node/edge JSON structure.
-    
+
     const agents = await this.prisma.agentRecord.findMany({
       where: { projectId },
       select: { id: true, name: true, currentRiskScore: true, status: true },
@@ -86,9 +95,17 @@ export class ThreatIntelService {
     });
 
     // Mock graph construction
-    const nodes = agents.map(a => ({ id: a.id, label: a.name, type: 'agent', score: a.currentRiskScore, status: a.status }));
-    
-    const intentNodes = Array.from(new Set(decisions.map(d => d.actionIntent))).map(intent => ({
+    const nodes = agents.map((a) => ({
+      id: a.id,
+      label: a.name,
+      type: 'agent',
+      score: a.currentRiskScore,
+      status: a.status,
+    }));
+
+    const intentNodes = Array.from(
+      new Set(decisions.map((d) => d.actionIntent)),
+    ).map((intent) => ({
       id: intent,
       label: intent,
       type: 'tool',
@@ -97,7 +114,7 @@ export class ThreatIntelService {
     // In a real graph, we'd map which agent called which tool. For now, we mock edges from the aggregate.
     return {
       nodes: [...nodes, ...intentNodes],
-      edges: decisions.map(d => ({
+      edges: decisions.map((d) => ({
         source: nodes[0]?.id, // Mocking that the first agent did it
         target: d.actionIntent,
         outcome: d.outcome,

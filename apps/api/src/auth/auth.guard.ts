@@ -21,7 +21,8 @@ export class AuthGuard implements CanActivate {
       ?.replace(/^Bearer\s+/i, '')
       .trim();
     const headerApiKey = request.headers['x-api-key'];
-    const apiKey = (typeof headerApiKey === 'string' ? headerApiKey : undefined) ?? bearer;
+    const apiKey =
+      (typeof headerApiKey === 'string' ? headerApiKey : undefined) ?? bearer;
 
     if (!apiKey) {
       throw new UnauthorizedException('Missing API credentials');
@@ -29,7 +30,18 @@ export class AuthGuard implements CanActivate {
 
     // Check if the credential is a valid Agent Token
     const agentData = await this.agentAuth.validateToken(apiKey);
+    
+    const rawProjectId = request.headers['x-project-id'];
+    const headerProjectId =
+      typeof rawProjectId === 'string' && rawProjectId.trim().length > 0
+        ? rawProjectId.trim()
+        : undefined;
+
     if (agentData) {
+      if (headerProjectId && headerProjectId !== agentData.projectId) {
+        throw new ForbiddenException('Project scope mismatch');
+      }
+
       request.auth = {
         apiKeyId: agentData.clientId,
         role: 'agent' as any, // Add agent role
@@ -48,13 +60,7 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException('Invalid API credentials');
     }
 
-    const rawProjectId = request.headers['x-project-id'];
-    const projectId =
-      typeof rawProjectId === 'string' && rawProjectId.trim().length > 0
-        ? rawProjectId.trim()
-        : undefined;
-
-    if (!projectId) {
+    if (!headerProjectId) {
       throw new ForbiddenException('x-project-id header is required');
     }
 
@@ -67,7 +73,7 @@ export class AuthGuard implements CanActivate {
     request.auth = {
       apiKeyId: apiKey,
       role: ALLOWED_ROLES.includes(normalizedRole) ? normalizedRole : 'viewer',
-      projectId,
+      projectId: headerProjectId,
     };
 
     return true;

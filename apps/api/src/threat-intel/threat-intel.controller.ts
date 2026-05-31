@@ -11,13 +11,13 @@ export class ThreatIntelController {
 
   @Get('leaderboard')
   @Roles('admin', 'approver', 'viewer')
-  async getLeaderboard(@Request() req: any) {
+  async getLeaderboard(@Request() req: { auth: { projectId: string } }) {
     return this.threatIntel.getLeaderboard(req.auth.projectId);
   }
 
   @Get('graph')
   @Roles('admin', 'approver', 'viewer')
-  async getTrustGraph(@Request() req: any) {
+  async getTrustGraph(@Request() req: { auth: { projectId: string } }) {
     return this.threatIntel.getTrustGraph(req.auth.projectId);
   }
 }

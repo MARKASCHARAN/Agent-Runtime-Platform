@@ -13,17 +13,38 @@ export class PrivacyService {
   // Active DLP Patterns
   private readonly DLP_PATTERNS = {
     // HIGH Severity: Secrets and Keys that lead to immediate compromise
-    AWS_SECRET_KEY: { regex: /(?<![A-Za-z0-9/+=])[A-Za-z0-9/+=]{40}(?![A-Za-z0-9/+=])/g, severity: 'HIGH' as const },
-    AWS_ACCESS_KEY: { regex: /\b(AKIA|A3T|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}\b/g, severity: 'HIGH' as const },
-    PRIVATE_KEY: { regex: /-----BEGIN PRIVATE KEY-----/g, severity: 'HIGH' as const },
-    JWT_TOKEN: { regex: /ey[a-zA-Z0-9_-]{10,}\.ey[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}/g, severity: 'HIGH' as const },
-    
+    AWS_SECRET_KEY: {
+      regex: /(?<![A-Za-z0-9/+=])[A-Za-z0-9/+=]{40}(?![A-Za-z0-9/+=])/g,
+      severity: 'HIGH' as const,
+    },
+    AWS_ACCESS_KEY: {
+      regex: /\b(AKIA|A3T|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}\b/g,
+      severity: 'HIGH' as const,
+    },
+    PRIVATE_KEY: {
+      regex: /-----BEGIN PRIVATE KEY-----/g,
+      severity: 'HIGH' as const,
+    },
+    JWT_TOKEN: {
+      regex: /ey[a-zA-Z0-9_-]{10,}\.ey[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}/g,
+      severity: 'HIGH' as const,
+    },
+
     // MEDIUM Severity: PII
-    CREDIT_CARD: { regex: /\b(?:\d[ -]*?){13,16}\b/g, severity: 'MEDIUM' as const },
-    SSN: { regex: /\b\d{3}[-.]?\d{2}[-.]?\d{4}\b/g, severity: 'MEDIUM' as const },
-    
+    CREDIT_CARD: {
+      regex: /\b(?:\d[ -]*?){13,16}\b/g,
+      severity: 'MEDIUM' as const,
+    },
+    SSN: {
+      regex: /\b\d{3}[-.]?\d{2}[-.]?\d{4}\b/g,
+      severity: 'MEDIUM' as const,
+    },
+
     // LOW Severity: Contact Info
-    EMAIL: { regex: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, severity: 'LOW' as const },
+    EMAIL: {
+      regex: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
+      severity: 'LOW' as const,
+    },
   };
 
   /**
@@ -69,7 +90,10 @@ export class PrivacyService {
     if (typeof data === 'object' && data !== null) {
       const redactedObj: any = {};
       for (const [key, value] of Object.entries(data)) {
-        if (/secret|password|token|key/i.test(key) && typeof value === 'string') {
+        if (
+          /secret|password|token|key/i.test(key) &&
+          typeof value === 'string'
+        ) {
           redactedObj[key] = '[REDACTED_KEY_MATCH]';
         } else {
           redactedObj[key] = this.redact(value);

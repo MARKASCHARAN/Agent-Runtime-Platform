@@ -36,6 +36,7 @@ export default function DlpDashboardPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchViolations();
     const interval = setInterval(fetchViolations, 5000);
     return () => clearInterval(interval);

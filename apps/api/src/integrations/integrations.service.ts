@@ -12,7 +12,9 @@ export class IntegrationsService {
       where: { projectId },
     });
 
-    const targetWebhooks = webhooks.filter((w) => w.events.includes(eventType) || w.events.includes('*'));
+    const targetWebhooks = webhooks.filter(
+      (w) => w.events.includes(eventType) || w.events.includes('*'),
+    );
 
     for (const webhook of targetWebhooks) {
       this.logger.log(`Dispatching ${eventType} to ${webhook.url}`);
@@ -23,7 +25,11 @@ export class IntegrationsService {
             'Content-Type': 'application/json',
             'x-webhook-secret': webhook.secret,
           },
-          body: JSON.stringify({ event: eventType, data: payload, timestamp: new Date().toISOString() }),
+          body: JSON.stringify({
+            event: eventType,
+            data: payload,
+            timestamp: new Date().toISOString(),
+          }),
         });
       } catch (err) {
         this.logger.error(`Failed to dispatch to ${webhook.url}`, err);

@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Patch, Body, Param, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Param,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { McpTrustService } from './mcp-trust.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -11,19 +20,22 @@ export class McpTrustController {
 
   @Get('registry')
   @Roles('admin', 'approver', 'viewer')
-  async getRegistry(@Request() req: any) {
+  async getRegistry(@Request() req: { auth: { projectId: string } }) {
     return this.mcpTrust.getRegistry(req.auth.projectId);
   }
 
   @Post('registry')
   @Roles('admin')
-  async addTool(@Body() body: { name: string; publisher: string; schemaHash: string }, @Request() req: any) {
+  async addTool(
+    @Body() body: { name: string; publisher: string; schemaHash: string },
+    @Request() req: { auth: { projectId: string } },
+  ) {
     return this.mcpTrust.addTool(body, req.auth.projectId);
   }
 
   @Patch('registry/:id/revoke')
   @Roles('admin')
-  async revokeTool(@Param('id') id: string, @Request() req: any) {
+  async revokeTool(@Param('id') id: string, @Request() req: { auth: { projectId: string } }) {
     return this.mcpTrust.revokeTool(id, req.auth.projectId);
   }
 }

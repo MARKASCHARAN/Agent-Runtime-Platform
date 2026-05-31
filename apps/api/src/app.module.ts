@@ -18,7 +18,6 @@ import { AgentAuthModule } from './agent-auth/agent-auth.module';
 import { AgentInventoryModule } from './agent-inventory/agent-inventory.module';
 import { ThreatIntelModule } from './threat-intel/threat-intel.module';
 
-
 @Module({
   imports: [
     PrismaModule,
